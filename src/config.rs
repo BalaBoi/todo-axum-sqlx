@@ -42,6 +42,12 @@ pub struct Application {
     pub host: String,
 }
 
+impl Application {
+    pub fn ip_addr(&self) -> String {
+        format!("{}:{}", self.host, self.port)
+    }
+}
+
 #[derive(Debug, serde::Deserialize)]
 pub struct Postgres {
     pub user: String,

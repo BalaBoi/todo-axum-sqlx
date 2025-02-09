@@ -4,7 +4,7 @@ create table task(
     description     text,
     completed       boolean     not null default false,
     created_at      timestamptz not null default now(),
-    updated_at      timestamptz
+    updated_at      timestamptz not null default now()
 );
 
 select trigger_updated_at('task');
