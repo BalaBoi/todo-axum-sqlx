@@ -4,7 +4,8 @@ use error::Error;
 use logging::init_tracing_subscriber;
 use sqlx::PgPool;
 use tokio::net::TcpListener;
-use tower_http::trace::TraceLayer;
+use tower_http::trace::{DefaultMakeSpan, DefaultOnRequest, DefaultOnResponse, TraceLayer};
+use tracing::Level;
 
 pub mod config;
 pub mod error;
@@ -26,9 +27,14 @@ pub async fn serve_app() -> anyhow::Result<()> {
         .context("Error running HTTP server")
 }
 
-fn api_router(pg: PgPool) -> Router {
+pub fn api_router(pg: PgPool) -> Router {
     Router::new()
         .merge(tasks::router())
-        .layer(TraceLayer::new_for_http())
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(DefaultMakeSpan::new().include_headers(true))
+                .on_request(DefaultOnRequest::new().level(Level::INFO))
+                .on_response(DefaultOnResponse::new().level(Level::INFO)),
+        )
         .with_state(pg)
 }
