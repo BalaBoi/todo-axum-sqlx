@@ -8,7 +8,7 @@ mod helpers;
 #[sqlx::test]
 async fn creating_a_task(pool: PgPool) {
     let app = test_app(pool).unwrap();
-    let _task: Task = app
+    let task: Task = app
         .post("/todo")
         .json(&json!({
             "title": "Hello",
@@ -17,5 +17,6 @@ async fn creating_a_task(pool: PgPool) {
         .await
         .json();
 
-    // TODO Figure out how to do assertions on a struct
+    assert_eq!(task.title, "Hello");
+    assert_eq!(task.description, Some("This is the description".into()));
 }

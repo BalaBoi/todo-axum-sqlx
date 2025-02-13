@@ -29,7 +29,7 @@ pub async fn serve_app() -> anyhow::Result<()> {
 
 pub fn api_router(pg: PgPool) -> Router {
     Router::new()
-        .merge(tasks::router())
+        .nest("/todo", tasks::router())
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(DefaultMakeSpan::new().include_headers(true))
