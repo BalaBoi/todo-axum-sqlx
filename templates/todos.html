@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Your Todos</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 2em;
+      background: #f4f4f4;
+    }
+    .container {
+      max-width: 800px;
+      margin: auto;
+      background: #fff;
+      padding: 2em;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h1 {
+      text-align: center;
+    }
+    .new-todo {
+      display: block;
+      margin-bottom: 1em;
+      text-align: right;
+    }
+    .new-todo a button {
+      padding: 0.5em 1em;
+      background: #007acc;
+      border: none;
+      color: #fff;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .new-todo a button:hover {
+      background: #005fa3;
+    }
+    ul {
+      list-style: none;
+      padding: 0;
+    }
+    li {
+      border-bottom: 1px solid #ddd;
+      padding: 1em 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .todo-info {
+      flex-grow: 1;
+    }
+    .todo-title {
+      font-weight: bold;
+    }
+    .edit-button a button {
+      padding: 0.3em 0.75em;
+      background: #28a745;
+      border: none;
+      color: #fff;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .edit-button a button:hover {
+      background: #1e7e34;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Your Todos</h1>
+    <div class="new-todo">
+      <a href="/todo/new"><button>Create New Todo</button></a>
+    </div>
+    <ul>
+      {% for todo in todos %}
+      <li>
+        <div class="todo-info">
+          <div class="todo-title">{{ todo.title }}</div>
+          
+        {% if let Some(desc) = todo.description %}
+        <div class="todo-description">
+            {{ desc }}
+        </div>
+        {% endif %}
+        <div class="todo-completed">{{ todo.completed }}</div>
+        </div>
+        <div class="edit-button">
+          <a href="/todo/{{ todo.task_id }}/edit"><button>Edit</button></a>
+        </div>
+      </li>
+      {% else %}
+      <li>No todos available. Start by creating a new one!</li>
+      {% endfor %}
+    </ul>
+  </div>
+</body>
+</html>

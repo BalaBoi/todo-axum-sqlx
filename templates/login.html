@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Login - Todo App</title>
+  <style>
+    body { font-family: sans-serif; margin: 2em; }
+    form { max-width: 400px; margin: auto; }
+    label { display: block; margin-top: 1em; }
+    input { width: 100%; padding: 0.5em; margin-top: 0.5em; }
+    button { margin-top: 1em; padding: 0.5em 1em; }
+  </style>
+</head>
+<body>
+  <h1>Login</h1>
+  <form action="/users/login" method="post">
+    <label for="email">Email:</label>
+    <input type="email" id="email" name="email" required />
+
+    <label for="password">Password:</label>
+    <input type="password" id="password" name="password" required />
+
+    <button type="submit">Log In</button>
+  </form>
+  <p>
+    Don't have an account? <a href="/users/register">Register here</a>.
+  </p>
+</body>
+</html>

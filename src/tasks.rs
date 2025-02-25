@@ -1,19 +1,40 @@
+use anyhow::Context;
+use askama::Template;
 use axum::{
     extract::{Path, State},
-    http::StatusCode,
-    routing::{delete, post},
-    Json, Router,
+    response::{Html, Redirect},
+    routing::{delete, get, post},
+    Form, Json, Router,
 };
 use sqlx::PgPool;
 use time::OffsetDateTime;
+use tracing::instrument;
 use uuid::Uuid;
 
-use crate::{error::Error, Result};
+use crate::{error::Error, ApiState, Result};
 
-pub fn router() -> Router<PgPool> {
+pub fn router() -> Router<ApiState> {
     Router::new()
-        .route("/", post(create_task).get(get_tasks))
-        .route("/{task_id}", delete(delete_task).get(get_task).put(update_task))
+        .route("/", post(create_task).get(tasks_page))
+        .route(
+            "/{task_id}",
+            delete(delete_task).get(get_task).post(update_task),
+        )
+        .route("/{task_id}/edit", get(edit_task_page))
+        .route("/new", get(new_todo_page))
+}
+
+#[derive(Template)]
+#[template(path = "new_todo.html")]
+struct NewTodoTemplate;
+
+#[instrument(skip_all)]
+async fn new_todo_page() -> Result<Html<String>> {
+    Ok(Html(
+        NewTodoTemplate
+            .render()
+            .context("Error in NewTodoTemplate")?,
+    ))
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -34,34 +55,39 @@ pub struct Task {
 
 #[derive(Debug, serde::Deserialize)]
 struct UpdateTask {
-    title: Option<String>,
-    description: Option<String>,
-    completed: Option<bool>,
+    title: String,
+    description: String,
+    #[serde(default)]
+    completed: bool,
 }
 
-#[tracing::instrument(skip(pool))]
+#[instrument(
+    skip_all,
+    fields(
+        action = "creating a task",
+        %new_task.title,
+        ?new_task.description
+    )
+)]
 async fn create_task(
     State(pool): State<PgPool>,
-    Json(new_task): Json<NewTask>,
-) -> Result<(StatusCode, Json<Task>)> {
-    tracing::info!("Hello");
-    let task = sqlx::query_as!(
-        Task,
+    Form(new_task): Form<NewTask>,
+) -> Result<Redirect> {
+    sqlx::query!(
         r#"
         insert into task (title, description)
         values ($1, $2)
-        returning task_id, title, description, completed, created_at, updated_at
         "#,
         new_task.title,
         new_task.description.unwrap_or_else(|| "".into())
     )
-    .fetch_one(&pool)
+    .execute(&pool)
     .await?;
 
-    Ok((StatusCode::CREATED, Json(task)))
+    Ok(Redirect::to("/todo"))
 }
 
-#[tracing::instrument(skip(pool))]
+#[instrument(skip_all, fields(action = "deleting a task", %task_id))]
 async fn delete_task(State(pool): State<PgPool>, Path(task_id): Path<Uuid>) -> Result<()> {
     let query_result = sqlx::query!(
         r#"
@@ -80,8 +106,14 @@ async fn delete_task(State(pool): State<PgPool>, Path(task_id): Path<Uuid>) -> R
     Ok(())
 }
 
-#[tracing::instrument(skip(pool))]
-async fn get_tasks(State(pool): State<PgPool>) -> Result<Json<Vec<Task>>> {
+#[derive(Template)]
+#[template(path = "todos.html")]
+struct TodosTemplate {
+    todos: Vec<Task>,
+}
+
+#[instrument(skip_all, fields(action = "displaying tasks page"))]
+async fn tasks_page(State(pool): State<PgPool>) -> Result<Html<String>, Error> {
     let tasks = sqlx::query_as!(
         Task,
         r#"
@@ -91,10 +123,14 @@ async fn get_tasks(State(pool): State<PgPool>) -> Result<Json<Vec<Task>>> {
     .fetch_all(&pool)
     .await?;
 
-    Ok(Json(tasks))
+    Ok(Html(
+        TodosTemplate { todos: tasks }
+            .render()
+            .context("Error in TodosTemplate")?,
+    ))
 }
 
-#[tracing::instrument(skip(pool))]
+#[instrument(skip_all, fields(action = "get a task", %task_id))]
 async fn get_task(State(pool): State<PgPool>, Path(task_id): Path<Uuid>) -> Result<Json<Task>> {
     let task = sqlx::query_as!(
         Task,
@@ -114,12 +150,17 @@ async fn get_task(State(pool): State<PgPool>, Path(task_id): Path<Uuid>) -> Resu
     Ok(Json(task.unwrap()))
 }
 
-#[tracing::instrument(skip(pool))]
-async fn update_task(
+#[derive(Template)]
+#[template(path = "edit_todo.html")]
+struct EditTodoTemplate {
+    todo: Task,
+}
+
+#[instrument(skip_all, fields(action = "displaying edit task page", %task_id))]
+async fn edit_task_page(
     State(pool): State<PgPool>,
     Path(task_id): Path<Uuid>,
-    Json(update_task): Json<UpdateTask>,
-) -> Result<Json<Task>> {
+) -> Result<Html<String>> {
     let task = sqlx::query_as!(
         Task,
         r#"
@@ -135,32 +176,46 @@ async fn update_task(
         return Err(Error::NotFound);
     }
 
-    let mut task = task.unwrap();
+    Ok(Html(
+        EditTodoTemplate {
+            todo: task.unwrap(),
+        }
+        .render()
+        .context("Error in EditTodoTemplate")?,
+    ))
+}
 
-    if update_task.title.is_some() {
-        task.title = update_task.title.unwrap();
-    }
-
-    if update_task.description.is_some() {
-        task.description = update_task.description;
-    }
-
-    if update_task.completed.is_some() {
-        task.completed = update_task.completed.unwrap();
-    }
-
-    let task = sqlx::query_as!(
-        Task,
+#[instrument(
+    skip_all,
+    fields(
+        action = "Updating a task",
+        %task_id,
+        %update_task.title,
+        %update_task.description,
+        %update_task.completed,
+))]
+async fn update_task(
+    State(pool): State<PgPool>,
+    Path(task_id): Path<Uuid>,
+    Form(update_task) :Form<UpdateTask>,
+) -> Result<Redirect> {
+    let query_result = sqlx::query!(
         r#"
-        insert into task (title, description)
-        values ($1, $2)
-        returning task_id, title, description, completed, created_at, updated_at
+        update task
+        set title = $2, description = $3, completed = $4
+        where task_id = $1
         "#,
-        task.title,
-        task.description.unwrap_or_else(|| "".into())
+        &task_id,
+        &update_task.title,
+        &update_task.description,
+        update_task.completed
     )
-    .fetch_one(&pool)
+    .execute(&pool)
     .await?;
 
-    Ok(Json(task))
+    if query_result.rows_affected() == 0 {
+        return Err(Error::NotFound);
+    }
+
+    Ok(Redirect::to("/todo"))
 }

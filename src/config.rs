@@ -40,6 +40,7 @@ pub struct Settings {
 pub struct Application {
     pub port: u16,
     pub host: String,
+    pub hmac_key: SecretString,
 }
 
 impl Application {

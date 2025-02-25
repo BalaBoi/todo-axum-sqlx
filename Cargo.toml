@@ -5,6 +5,8 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.95"
+argon2 = { version = "0.5.3", features = ["std"] }
+askama = "0.12.1"
 axum = { version = "0.8.1", features = ["macros"] }
 config = "0.15.7"
 secrecy = { version = "0.10.3", features = ["serde"] }
