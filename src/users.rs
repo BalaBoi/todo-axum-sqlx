@@ -17,7 +17,7 @@ use sqlx::PgPool;
 
 use crate::{
     error::{Error, ResultExt},
-    ApiState, Result,
+    utilities::{ApiState, Result},
 };
 
 pub fn router() -> Router<ApiState> {

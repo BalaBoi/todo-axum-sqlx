@@ -1,40 +1,21 @@
 use anyhow::Context;
 use askama::Template;
 use axum::{
-    extract::FromRef,
     response::{Html, IntoResponse},
     routing::get,
     Router,
 };
-use error::Error;
-use secrecy::SecretString;
-use sqlx::PgPool;
 use tokio::net::TcpListener;
 use tower_http::trace::TraceLayer;
 use tracing::{info, instrument, trace};
+use utilities::{ApiState, HmacKey};
 
 mod config;
 mod error;
 pub mod logging;
-pub mod tasks;
+mod tasks;
 mod users;
-
-pub type Result<T, E = Error> = std::result::Result<T, E>;
-
-#[derive(Debug, Clone, FromRef)]
-pub struct ApiState {
-    pool: PgPool,
-    hmac_key: HmacKey,
-}
-
-impl ApiState {
-    pub fn new(pool: PgPool, hmac_key: HmacKey) -> Self {
-        Self { pool, hmac_key }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct HmacKey(pub SecretString);
+pub mod utilities;
 
 pub async fn serve_app() -> anyhow::Result<()> {
     trace!("getting config");
