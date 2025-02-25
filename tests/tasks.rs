@@ -7,15 +7,14 @@ mod helpers;
 #[sqlx::test]
 async fn creating_a_task(pool: PgPool) {
     let app = test_app(pool).unwrap();
-    let task: serde_json::Value = app
+    let response = app
         .post("/todo")
-        .json(&json!({
+        .form(&json!({
             "title": "Hello",
             "description": "This is the description",
         }))
-        .await
-        .json();
+        .await;
 
-    assert_eq!(task.get("title").unwrap(), "Hello");
-    assert_eq!(task.get("description").unwrap(), "This is the description");
+    response.assert_status_see_other();
+    response.assert_header("Location", "/todo");
 }
