@@ -1,10 +1,6 @@
 use anyhow::Context;
 use askama::Template;
-use axum::{
-    response::IntoResponse,
-    routing::get,
-    Router,
-};
+use axum::{response::IntoResponse, routing::get, Router};
 use tokio::net::TcpListener;
 use tower_http::trace::TraceLayer;
 use tracing::{info, instrument, trace};

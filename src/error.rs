@@ -3,6 +3,8 @@ use std::{borrow::Cow, collections::HashMap};
 use axum::{http::StatusCode, response::{IntoResponse, Redirect}};
 use sqlx::error::DatabaseError;
 
+use crate::utilities::FlashMessage;
+
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("an error occurred with the databse")]
@@ -16,7 +18,7 @@ pub enum Error {
         errors: HashMap<Cow<'static, str>, Vec<Cow<'static, str>>>,
     },
     #[error("error in authentication")]
-    Unauthorized,
+    Unauthorized(FlashMessage),
     #[error("error in displaying page")]
     Template(#[from] askama::Error),
 }
@@ -27,7 +29,7 @@ impl Error {
             Self::NotFound => StatusCode::NOT_FOUND,
             Self::UnprocessableEntity { errors: _ } => StatusCode::UNPROCESSABLE_ENTITY,
             Self::Other(_) | Self::SQLx(_) | Self::Template(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            Self::Unauthorized => StatusCode::SEE_OTHER,
+            Self::Unauthorized(_) => StatusCode::SEE_OTHER,
         }
     }
 
@@ -54,10 +56,9 @@ impl IntoResponse for Error {
                 tracing::trace!("Errors in the reguest: {:?}", errors)
             }
             Self::Other(error) => tracing::error!("Generic error: {:?}", error),
-            Self::Unauthorized => {
+            Self::Unauthorized(flash_msg) => {
                 tracing::trace!("Authentication failed");
-                let flash_error = urlencoding::encode("incorrect credentials");
-                return Redirect::to(&format!("/users/login?error={}", flash_error)).into_response();
+                return Redirect::to(&format!("/users/login?{}", flash_msg.query_string("error"))).into_response();
             },
             Self::Template(error) => tracing::error!("Template rendering error: {:?}", error),
             _ => {}

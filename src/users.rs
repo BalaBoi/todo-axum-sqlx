@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use anyhow::Context;
 use argon2::{
     password_hash::{rand_core::OsRng, SaltString},
@@ -7,20 +5,21 @@ use argon2::{
 };
 use askama::Template;
 use axum::{
-    extract::{State, Query},
+    extract::State,
     http::StatusCode,
     response::{Html, IntoResponse, Redirect},
     routing::get,
     Form, Json, Router,
 };
+use axum_extra::extract::OptionalQuery;
 use secrecy::{ExposeSecret, SecretString};
 use serde::Deserialize;
 use sqlx::PgPool;
-use tracing::debug;
+use tracing::{debug, warn};
 
 use crate::{
     error::{Error, ResultExt},
-    utilities::{render_template, ApiState, Result},
+    utilities::{render_template, ApiState, FlashMessage, Result, HmacKey},
 };
 
 pub fn router() -> Router<ApiState> {
@@ -47,16 +46,31 @@ struct LoginTemplate {
     errors: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+struct ErrorFlash {
+    error: String,
+    tag: String,
+}
+
 #[axum::debug_handler]
 #[tracing::instrument]
-async fn login_page(Query(query_params): Query<HashMap<String, String>>) -> impl IntoResponse {
-    let errors = query_params.get("error").map(ToOwned::to_owned);
+async fn login_page(State(hmac_key): State<HmacKey>, OptionalQuery(error_flash): OptionalQuery<ErrorFlash>) -> impl IntoResponse {
+    
+    let errors = match error_flash {
+        Some(err_flash) => {
+            if FlashMessage::verify(&err_flash.error, &err_flash.tag, &hmac_key) {
+                Some(err_flash.error)
+            } else {
+                warn!("Flash msg with invalid tag");
+                None
+            }
+        },
+        None => None,
+    };
 
-    debug!(?errors);
+    debug!(flash_errors = ?errors);
 
-    render_template(LoginTemplate {
-        errors
-    })
+    render_template(LoginTemplate { errors })
 }
 
 #[derive(Debug, Deserialize)]
@@ -122,9 +136,9 @@ struct UpdateUser {
     new_password: SecretString,
 }
 
-#[tracing::instrument(skip(pool))]
+#[tracing::instrument(skip_all)]
 async fn update_user(
-    State(pool): State<PgPool>,
+    State(api_state): State<ApiState>,
     Json(user_update): Json<UpdateUser>,
 ) -> Result<()> {
     let password_hash = hash_password(&user_update.prev_password).await?;
@@ -136,12 +150,12 @@ async fn update_user(
         "#,
         &user_update.username
     )
-    .fetch_optional(&pool)
+    .fetch_optional(&api_state.pool)
     .await?
-    .ok_or_else(|| Error::NotFound)?;
+    .ok_or_else(|| Error::Unauthorized(FlashMessage::new("Incorrect Credentials", &api_state.hmac_key)))?;
 
     if retrieved_record.password_hash != password_hash {
-        return Err(Error::Unauthorized);
+        return Err(Error::Unauthorized(FlashMessage::new("Incorrect Credentials", &api_state.hmac_key)));
     }
 
     let new_password_hash = hash_password(&user_update.new_password).await?;
@@ -156,7 +170,7 @@ async fn update_user(
         &new_password_hash,
         &retrieved_record.user_id
     )
-    .execute(&pool)
+    .execute(&api_state.pool)
     .await
     .map_if_constraint("users_username_key", |_| {
         Error::unprocessable_entity([("username", "username is already taken")])
@@ -182,7 +196,6 @@ async fn login_user(
     State(state): State<ApiState>,
     Form(credentials): Form<Credentials>,
 ) -> impl IntoResponse {
-    
     let password_hash = hash_password(&credentials.password).await?;
 
     let retrieved_record = sqlx::query!(
@@ -194,11 +207,11 @@ async fn login_user(
     )
     .fetch_optional(&state.pool)
     .await?
-    .ok_or_else(|| Error::Unauthorized)?;
+    .ok_or_else(|| Error::Unauthorized(FlashMessage::new("Incorrect Credentials", &state.hmac_key)))?;
 
     if password_hash == retrieved_record.password_hash {
         Ok(Redirect::to("/todo")) //Figure out how to do sessions here
     } else {
-        Err(Error::Unauthorized)
+        Err(Error::Unauthorized(FlashMessage::new("Incorrect Credentials", &state.hmac_key)))
     }
 }
