@@ -1,14 +1,14 @@
 use anyhow::Context;
 use askama::Template;
 use axum::{
-    response::{Html, IntoResponse},
+    response::IntoResponse,
     routing::get,
     Router,
 };
 use tokio::net::TcpListener;
 use tower_http::trace::TraceLayer;
 use tracing::{info, instrument, trace};
-use utilities::{ApiState, HmacKey};
+use utilities::{render_template, ApiState, HmacKey};
 
 mod config;
 mod error;
@@ -44,7 +44,7 @@ struct HomeTemplate;
 
 #[instrument(fields(action = "serving the home page"))]
 async fn home_page() -> impl IntoResponse {
-    Html(HomeTemplate.render().unwrap())
+    render_template(HomeTemplate)
 }
 
 pub fn api_router(state: ApiState) -> Router {

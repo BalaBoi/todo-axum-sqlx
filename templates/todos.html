@@ -17,8 +17,33 @@
       border-radius: 8px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
-    h1 {
+    h1, h2 {
       text-align: center;
+    }
+    h2 {
+      margin-top: 1.5em;
+      padding-bottom: 0.5em;
+      border-bottom: 1px solid #eee;
+      color: #555;
+      font-size: 1.2em;
+    }
+    .section-pending {
+      margin-bottom: 2em;
+    }
+    .section-completed {
+      opacity: 0.8;
+    }
+    .section-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .section-count {
+      background: #f0f0f0;
+      border-radius: 12px;
+      padding: 2px 10px;
+      font-size: 0.8em;
+      color: #666;
     }
     .new-todo {
       display: block;
@@ -39,32 +64,173 @@
     ul {
       list-style: none;
       padding: 0;
+      margin: 0;
     }
     li {
-      border-bottom: 1px solid #ddd;
+      border-bottom: 1px solid #eee;
       padding: 1em 0;
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
+    li:last-child {
+      border-bottom: none;
+    }
     .todo-info {
       flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5em;
     }
     .todo-title {
       font-weight: bold;
+      display: flex;
+      align-items: center;
+      gap: 0.5em;
     }
-    .edit-button a button {
+    .section-completed .todo-title {
+      text-decoration: line-through;
+      color: #777;
+    }
+    .todo-description {
+      color: #666;
+      margin-top: 0.25em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 500px;
+    }
+    .todo-completed {
+      display: inline-block;
+      padding: 0.25em 0.5em;
+      border-radius: 3px;
+      font-size: 0.8em;
+      margin-left: 0.5em;
+    }
+    .status-complete {
+      background-color: #d4edda;
+      color: #155724;
+    }
+    .status-pending {
+      background-color: #f8d7da;
+      color: #721c24;
+    }
+    .todo-actions {
+      display: flex;
+      gap: 0.5em;
+    }
+    .action-button {
       padding: 0.3em 0.75em;
-      background: #28a745;
       border: none;
       color: #fff;
       border-radius: 4px;
       cursor: pointer;
     }
-    .edit-button a button:hover {
+    .edit-button {
+      background: #28a745;
+    }
+    .edit-button:hover {
       background: #1e7e34;
     }
+    .delete-button {
+      background: #dc3545;
+    }
+    .delete-button:hover {
+      background: #bd2130;
+    }
+    .empty-list {
+      text-align: center;
+      color: #6c757d;
+      padding: 1em;
+      font-style: italic;
+    }
+    .todo-item {
+      display: none; /* Hide all items initially, JavaScript will show them */
+    }
+    .loading-message {
+      text-align: center;
+      padding: 1em;
+      font-style: italic;
+      color: #6c757d;
+    }
   </style>
+  <script>
+    // Function to delete a todo
+    function deleteTodo(taskId) {
+      if (confirm('Are you sure you want to delete this todo?')) {
+        fetch('/todo/' + taskId, {
+          method: 'DELETE'
+        })
+        .then(response => {
+          if (response.ok) {
+            window.location.reload();
+          } else {
+            alert('Failed to delete the todo. Please try again.');
+          }
+        })
+        .catch(error => {
+          console.error('Error:', error);
+          alert('An error occurred while trying to delete the todo.');
+        });
+      }
+    }
+
+    // Function to organize todos when the page loads
+    document.addEventListener('DOMContentLoaded', function() {
+      // Get references to our sections and counts
+      const pendingList = document.getElementById('pending-list');
+      const completedList = document.getElementById('completed-list');
+      const pendingCount = document.getElementById('pending-count');
+      const completedCount = document.getElementById('completed-count');
+      
+      // Get all todo items
+      const todoItems = document.querySelectorAll('.todo-item');
+      
+      // Initialize counters
+      let pendingItems = 0;
+      let completedItems = 0;
+      
+      // Process each todo item
+      todoItems.forEach(function(item) {
+        // Get completion status from data attribute
+        const isCompleted = item.getAttribute('data-completed') === 'true';
+        
+        // Move item to appropriate list and update counter
+        if (isCompleted) {
+          completedList.appendChild(item);
+          completedItems++;
+        } else {
+          pendingList.appendChild(item);
+          pendingItems++;
+        }
+        
+        // Make the item visible now that it's in the right list
+        item.style.display = 'flex';
+      });
+      
+      // Update count displays
+      pendingCount.textContent = pendingItems;
+      completedCount.textContent = completedItems;
+      
+      // Show empty messages if needed
+      if (pendingItems === 0) {
+        const emptyMessage = document.createElement('li');
+        emptyMessage.className = 'empty-list';
+        emptyMessage.textContent = 'No pending tasks. Great job!';
+        pendingList.appendChild(emptyMessage);
+      }
+      
+      if (completedItems === 0) {
+        const emptyMessage = document.createElement('li');
+        emptyMessage.className = 'empty-list';
+        emptyMessage.textContent = 'No completed tasks yet.';
+        completedList.appendChild(emptyMessage);
+      }
+      
+      // Hide loading message
+      document.getElementById('loading-message').style.display = 'none';
+    });
+  </script>
 </head>
 <body>
   <div class="container">
@@ -72,27 +238,58 @@
     <div class="new-todo">
       <a href="/todo/new"><button>Create New Todo</button></a>
     </div>
-    <ul>
-      {% for todo in todos %}
-      <li>
-        <div class="todo-info">
-          <div class="todo-title">{{ todo.title }}</div>
-          
+
+    <!-- Pending Tasks Section -->
+    <div class="section-pending">
+      <div class="section-heading">
+        <h2>Tasks to Complete</h2>
+        <span class="section-count" id="pending-count">0</span>
+      </div>
+      <ul id="pending-list">
+        <!-- Items will be moved here via JavaScript -->
+      </ul>
+    </div>
+
+    <!-- Completed Tasks Section -->
+    <div class="section-completed">
+      <div class="section-heading">
+        <h2>Completed Tasks</h2>
+        <span class="section-count" id="completed-count">0</span>
+      </div>
+      <ul id="completed-list">
+        <!-- Items will be moved here via JavaScript -->
+      </ul>
+    </div>
+    
+    <!-- Loading message shown until JavaScript runs -->
+    <div id="loading-message" class="loading-message">Organizing your tasks...</div>
+    
+    <!-- All todo items are initially defined here, but hidden -->
+    <!-- JavaScript will move them to the appropriate sections -->
+    {% for todo in todos %}
+    <li class="todo-item" data-completed="{{ todo.completed }}" style="display: none;">
+      <div class="todo-info">
+        <div class="todo-title">
+          {{ todo.title }}
+          <span class="todo-completed {% if todo.completed %}status-complete{% else %}status-pending{% endif %}">
+            {% if todo.completed %}Completed{% else %}Pending{% endif %}
+          </span>
+        </div>
+        
         {% if let Some(desc) = todo.description %}
         <div class="todo-description">
-            {{ desc }}
+          {{ desc }}
         </div>
         {% endif %}
-        <div class="todo-completed">{{ todo.completed }}</div>
-        </div>
-        <div class="edit-button">
-          <a href="/todo/{{ todo.task_id }}/edit"><button>Edit</button></a>
-        </div>
-      </li>
-      {% else %}
-      <li>No todos available. Start by creating a new one!</li>
-      {% endfor %}
-    </ul>
+      </div>
+      <div class="todo-actions">
+        <a href="/todo/{{ todo.task_id }}/edit">
+          <button class="action-button edit-button">Edit</button>
+        </a>
+        <button class="action-button delete-button" onclick="deleteTodo('{{ todo.task_id }}')">Delete</button>
+      </div>
+    </li>
+    {% endfor %}
   </div>
 </body>
 </html>
