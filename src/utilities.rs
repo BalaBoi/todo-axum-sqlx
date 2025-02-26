@@ -1,4 +1,5 @@
-use axum::extract::FromRef;
+use askama::Template;
+use axum::{extract::FromRef, response::Html};
 use secrecy::SecretString;
 use sqlx::PgPool;
 
@@ -20,3 +21,10 @@ impl ApiState {
 
 #[derive(Debug, Clone)]
 pub struct HmacKey(pub SecretString);
+
+pub fn render_template<T>(template: T) -> Result<Html<String>>
+where
+    T: Template,
+{
+    Ok(Html(template.render()?))
+}

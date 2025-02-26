@@ -17,6 +17,8 @@ pub enum Error {
     },
     #[error("error in authentication")]
     Unauthorized,
+    #[error("error in displaying page")]
+    Template(#[from] askama::Error),
 }
 
 impl Error {
@@ -24,7 +26,7 @@ impl Error {
         match self {
             Self::NotFound => StatusCode::NOT_FOUND,
             Self::UnprocessableEntity { errors: _ } => StatusCode::UNPROCESSABLE_ENTITY,
-            Self::Other(_) | Self::SQLx(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::Other(_) | Self::SQLx(_) | Self::Template(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Self::Unauthorized => StatusCode::UNAUTHORIZED,
         }
     }
@@ -53,6 +55,7 @@ impl IntoResponse for Error {
             }
             Self::Other(error) => tracing::error!("Generic error: {:?}", error),
             Self::Unauthorized => tracing::trace!("Authentication failed"),
+            Self::Template(error) => tracing::error!("Template rendering error: {:?}", error),
             _ => {}
         };
         (self.status_code(), self.to_string()).into_response()

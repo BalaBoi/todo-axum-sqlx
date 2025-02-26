@@ -1,25 +1,22 @@
-use anyhow::Context;
-use askama::Template;
 use axum::{
     extract::{Path, State},
     response::{Html, Redirect},
-    Form
+    Form,
 };
 use sqlx::PgPool;
 use tracing::instrument;
 use uuid::Uuid;
 
-use crate::{error::Error, utilities::Result};
+use crate::{
+    error::Error,
+    utilities::{render_template, Result},
+};
 
 use super::{db, templates::*};
 
 #[instrument(skip_all)]
 pub async fn new_todo_page() -> Result<Html<String>> {
-    Ok(Html(
-        NewTodoTemplate
-            .render()
-            .context("Error in NewTodoTemplate")?,
-    ))
+    render_template(NewTodoTemplate)
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -59,14 +56,10 @@ pub async fn delete_task(State(pool): State<PgPool>, Path(task_id): Path<Uuid>) 
 }
 
 #[instrument(skip_all, fields(action = "displaying tasks page"))]
-pub async fn tasks_page(State(pool): State<PgPool>) -> Result<Html<String>, Error> {
+pub async fn tasks_page(State(pool): State<PgPool>) -> Result<Html<String>> {
     let tasks = db::get_all_tasks(&pool).await?;
 
-    Ok(Html(
-        TodosTemplate { todos: tasks }
-            .render()
-            .context("Error in TodosTemplate")?,
-    ))
+    render_template(TodosTemplate { todos: tasks })
 }
 
 #[instrument(skip_all, fields(action = "displaying edit task page", %task_id))]
@@ -80,13 +73,9 @@ pub async fn edit_task_page(
         return Err(Error::NotFound);
     }
 
-    Ok(Html(
-        EditTodoTemplate {
-            todo: task.unwrap(),
-        }
-        .render()
-        .context("Error in EditTodoTemplate")?,
-    ))
+    render_template(EditTodoTemplate {
+        todo: task.unwrap(),
+    })
 }
 
 #[instrument(
