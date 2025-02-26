@@ -1,6 +1,7 @@
 use askama::Template;
 use axum::{extract::FromRef, response::Html};
 use secrecy::SecretString;
+use serde::Deserialize;
 use sqlx::PgPool;
 
 use crate::error::Error;
@@ -27,4 +28,9 @@ where
     T: Template,
 {
     Ok(Html(template.render()?))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct FlashError {
+    pub error: String,
 }

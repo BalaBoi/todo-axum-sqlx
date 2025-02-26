@@ -1,6 +1,6 @@
 use std::{borrow::Cow, collections::HashMap};
 
-use axum::{http::StatusCode, response::IntoResponse};
+use axum::{http::StatusCode, response::{IntoResponse, Redirect}};
 use sqlx::error::DatabaseError;
 
 #[derive(thiserror::Error, Debug)]
@@ -27,7 +27,7 @@ impl Error {
             Self::NotFound => StatusCode::NOT_FOUND,
             Self::UnprocessableEntity { errors: _ } => StatusCode::UNPROCESSABLE_ENTITY,
             Self::Other(_) | Self::SQLx(_) | Self::Template(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            Self::Unauthorized => StatusCode::UNAUTHORIZED,
+            Self::Unauthorized => StatusCode::SEE_OTHER,
         }
     }
 
@@ -54,7 +54,11 @@ impl IntoResponse for Error {
                 tracing::trace!("Errors in the reguest: {:?}", errors)
             }
             Self::Other(error) => tracing::error!("Generic error: {:?}", error),
-            Self::Unauthorized => tracing::trace!("Authentication failed"),
+            Self::Unauthorized => {
+                tracing::trace!("Authentication failed");
+                let flash_error = urlencoding::encode("incorrect credentials");
+                return Redirect::to(&format!("/users/login?error={}", flash_error)).into_response();
+            },
             Self::Template(error) => tracing::error!("Template rendering error: {:?}", error),
             _ => {}
         };

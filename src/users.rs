@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use anyhow::Context;
 use argon2::{
     password_hash::{rand_core::OsRng, SaltString},
@@ -5,7 +7,7 @@ use argon2::{
 };
 use askama::Template;
 use axum::{
-    extract::State,
+    extract::{State, Query},
     http::StatusCode,
     response::{Html, IntoResponse, Redirect},
     routing::get,
@@ -14,10 +16,11 @@ use axum::{
 use secrecy::{ExposeSecret, SecretString};
 use serde::Deserialize;
 use sqlx::PgPool;
+use tracing::debug;
 
 use crate::{
     error::{Error, ResultExt},
-    utilities::{ApiState, Result},
+    utilities::{render_template, ApiState, Result},
 };
 
 pub fn router() -> Router<ApiState> {
@@ -40,11 +43,20 @@ async fn register_page() -> impl IntoResponse {
 
 #[derive(Template)]
 #[template(path = "login.html")]
-struct LoginTemplate;
+struct LoginTemplate {
+    errors: Option<String>,
+}
 
+#[axum::debug_handler]
 #[tracing::instrument]
-async fn login_page() -> impl IntoResponse {
-    Html(LoginTemplate.render().unwrap())
+async fn login_page(Query(query_params): Query<HashMap<String, String>>) -> impl IntoResponse {
+    let errors = query_params.get("error").map(ToOwned::to_owned);
+
+    debug!(?errors);
+
+    render_template(LoginTemplate {
+        errors
+    })
 }
 
 #[derive(Debug, Deserialize)]
@@ -170,7 +182,7 @@ async fn login_user(
     State(state): State<ApiState>,
     Form(credentials): Form<Credentials>,
 ) -> impl IntoResponse {
-    tracing::info!("reached login_user");
+    
     let password_hash = hash_password(&credentials.password).await?;
 
     let retrieved_record = sqlx::query!(
@@ -182,7 +194,7 @@ async fn login_user(
     )
     .fetch_optional(&state.pool)
     .await?
-    .ok_or_else(|| Error::NotFound)?;
+    .ok_or_else(|| Error::Unauthorized)?;
 
     if password_hash == retrieved_record.password_hash {
         Ok(Redirect::to("/todo")) //Figure out how to do sessions here
