@@ -1,10 +1,13 @@
+use anyhow::Context;
 use askama::Template;
 use axum::{extract::FromRef, response::Html};
+use axum_extra::extract::CookieJar;
 use hmac::{Hmac, Mac};
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use sqlx::PgPool;
+use tracing::{debug, warn};
 
 use crate::error::Error;
 
@@ -50,10 +53,6 @@ impl FlashMessage {
         }
     }
 
-    pub fn query_string(&self, key: &str) -> String {
-        format!("{}={}&tag={}", key, urlencoding::encode(&self.message), self.tag)
-    }
-
     pub fn verify(&self, secret: &HmacKey) -> bool {
         let tag = match hex::decode(&self.tag) {
             Ok(tag) => tag,
@@ -67,4 +66,27 @@ impl FlashMessage {
     pub fn message(&self) -> &str {
         &self.message
     }
+}
+
+pub fn get_flash_errors(
+    mut jar: CookieJar,
+    hmac_key: &HmacKey,
+) -> Result<(CookieJar, Option<String>)> {
+    let errors = match jar.get("error_flash") {
+        Some(err_flash) => {
+            debug!(err_flash = ?err_flash.to_string());
+            let err_flash: FlashMessage =
+                serde_json::from_str(err_flash.value()).context("Error in cookie value")?;
+            jar = jar.remove("error_flash");
+            if err_flash.verify(hmac_key) {
+                Some(err_flash.message().to_string())
+            } else {
+                warn!("Flash msg with invalid tag");
+                None
+            }
+        }
+        None => None,
+    };
+
+    Ok((jar, errors))
 }

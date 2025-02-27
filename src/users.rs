@@ -15,11 +15,11 @@ use axum_extra::extract::CookieJar;
 use secrecy::{ExposeSecret, SecretString};
 use serde::Deserialize;
 use sqlx::PgPool;
-use tracing::{debug, warn};
+use tracing::debug;
 
 use crate::{
     error::{Error, ResultExt},
-    utilities::{render_template, ApiState, FlashMessage, Result, HmacKey},
+    utilities::{get_flash_errors, render_template, ApiState, FlashMessage, HmacKey, Result},
 };
 
 pub fn router() -> Router<ApiState> {
@@ -46,23 +46,12 @@ struct LoginTemplate {
     errors: Option<String>,
 }
 
-#[axum::debug_handler]
 #[tracing::instrument]
-async fn login_page(State(hmac_key): State<HmacKey>, mut jar: CookieJar) -> Result<(CookieJar, Html<String>)> {
-    let errors = match jar.get("error_flash") {
-        Some(err_flash) => {
-            debug!(err_flash = ?err_flash.to_string());
-            let err_flash: FlashMessage = serde_json::from_str(err_flash.value()).context("Error in cookie value")?;
-            jar = jar.remove("error_flash");
-            if err_flash.verify(&hmac_key) {
-                Some(err_flash.message().to_string())
-            } else {
-                warn!("Flash msg with invalid tag");
-                None
-            }
-        },
-        None => None,
-    };
+async fn login_page(
+    State(hmac_key): State<HmacKey>,
+    jar: CookieJar,
+) -> Result<(CookieJar, Html<String>)> {
+    let (jar, errors) = get_flash_errors(jar, &hmac_key)?;
 
     debug!(flash_errors = ?errors);
 
@@ -148,10 +137,18 @@ async fn update_user(
     )
     .fetch_optional(&api_state.pool)
     .await?
-    .ok_or_else(|| Error::Unauthorized(FlashMessage::new("Incorrect Credentials", &api_state.hmac_key)))?;
+    .ok_or_else(|| {
+        Error::Unauthorized(FlashMessage::new(
+            "Incorrect Credentials",
+            &api_state.hmac_key,
+        ))
+    })?;
 
     if retrieved_record.password_hash != password_hash {
-        return Err(Error::Unauthorized(FlashMessage::new("Incorrect Credentials", &api_state.hmac_key)));
+        return Err(Error::Unauthorized(FlashMessage::new(
+            "Incorrect Credentials",
+            &api_state.hmac_key,
+        )));
     }
 
     let new_password_hash = hash_password(&user_update.new_password).await?;
@@ -203,11 +200,16 @@ async fn login_user(
     )
     .fetch_optional(&state.pool)
     .await?
-    .ok_or_else(|| Error::Unauthorized(FlashMessage::new("Incorrect Credentials", &state.hmac_key)))?;
+    .ok_or_else(|| {
+        Error::Unauthorized(FlashMessage::new("Incorrect Credentials", &state.hmac_key))
+    })?;
 
     if password_hash == retrieved_record.password_hash {
         Ok(Redirect::to("/todo")) //Figure out how to do sessions here
     } else {
-        Err(Error::Unauthorized(FlashMessage::new("Incorrect Credentials", &state.hmac_key)))
+        Err(Error::Unauthorized(FlashMessage::new(
+            "Incorrect Credentials",
+            &state.hmac_key,
+        )))
     }
 }
