@@ -1,6 +1,7 @@
 use std::{borrow::Cow, collections::HashMap};
 
 use axum::{http::StatusCode, response::{IntoResponse, Redirect}};
+use axum_extra::extract::{cookie::Cookie, CookieJar};
 use sqlx::error::DatabaseError;
 
 use crate::utilities::FlashMessage;
@@ -58,7 +59,8 @@ impl IntoResponse for Error {
             Self::Other(error) => tracing::error!("Generic error: {:?}", error),
             Self::Unauthorized(flash_msg) => {
                 tracing::trace!("Authentication failed");
-                return Redirect::to(&format!("/users/login?{}", flash_msg.query_string("error"))).into_response();
+                let jar = CookieJar::new().add(Cookie::new("error_flash", serde_json::to_string(flash_msg).unwrap()));
+                return (jar, Redirect::to("/users/login")).into_response();
             },
             Self::Template(error) => tracing::error!("Template rendering error: {:?}", error),
             _ => {}

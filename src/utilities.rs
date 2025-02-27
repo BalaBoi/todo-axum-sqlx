@@ -2,6 +2,7 @@ use askama::Template;
 use axum::{extract::FromRef, response::Html};
 use hmac::{Hmac, Mac};
 use secrecy::{ExposeSecret, SecretString};
+use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use sqlx::PgPool;
 
@@ -31,7 +32,7 @@ where
     Ok(Html(template.render()?))
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct FlashMessage {
     message: String,
     tag: String,
@@ -53,13 +54,17 @@ impl FlashMessage {
         format!("{}={}&tag={}", key, urlencoding::encode(&self.message), self.tag)
     }
 
-    pub fn verify(msg: &str, tag: &str, secret: &HmacKey) -> bool {
-        let tag = match hex::decode(tag) {
+    pub fn verify(&self, secret: &HmacKey) -> bool {
+        let tag = match hex::decode(&self.tag) {
             Ok(tag) => tag,
             Err(_) => return false,
         };
         let mut mac = Hmac::<Sha256>::new_from_slice(secret.0.expose_secret().as_bytes()).unwrap();
-        mac.update(msg.as_bytes());
+        mac.update(self.message.as_bytes());
         mac.verify_slice(&tag).is_ok()
+    }
+
+    pub fn message(&self) -> &str {
+        &self.message
     }
 }

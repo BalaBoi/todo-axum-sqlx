@@ -8,7 +8,7 @@ anyhow = "1.0.95"
 argon2 = { version = "0.5.3", features = ["std"] }
 askama = "0.12.1"
 axum = { version = "0.8.1", features = ["macros"] }
-axum-extra = { version = "0.10.0", features = ["query"] }
+axum-extra = { version = "0.10.0", features = ["query", "cookie"] }
 config = "0.15.7"
 hex = "0.4.3"
 hmac = "0.12.1"

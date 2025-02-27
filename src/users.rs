@@ -11,7 +11,7 @@ use axum::{
     routing::get,
     Form, Json, Router,
 };
-use axum_extra::extract::OptionalQuery;
+use axum_extra::extract::CookieJar;
 use secrecy::{ExposeSecret, SecretString};
 use serde::Deserialize;
 use sqlx::PgPool;
@@ -46,20 +46,16 @@ struct LoginTemplate {
     errors: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
-struct ErrorFlash {
-    error: String,
-    tag: String,
-}
-
 #[axum::debug_handler]
 #[tracing::instrument]
-async fn login_page(State(hmac_key): State<HmacKey>, OptionalQuery(error_flash): OptionalQuery<ErrorFlash>) -> impl IntoResponse {
-    
-    let errors = match error_flash {
+async fn login_page(State(hmac_key): State<HmacKey>, mut jar: CookieJar) -> Result<(CookieJar, Html<String>)> {
+    let errors = match jar.get("error_flash") {
         Some(err_flash) => {
-            if FlashMessage::verify(&err_flash.error, &err_flash.tag, &hmac_key) {
-                Some(err_flash.error)
+            debug!(err_flash = ?err_flash.to_string());
+            let err_flash: FlashMessage = serde_json::from_str(err_flash.value()).context("Error in cookie value")?;
+            jar = jar.remove("error_flash");
+            if err_flash.verify(&hmac_key) {
+                Some(err_flash.message().to_string())
             } else {
                 warn!("Flash msg with invalid tag");
                 None
@@ -70,7 +66,7 @@ async fn login_page(State(hmac_key): State<HmacKey>, OptionalQuery(error_flash):
 
     debug!(flash_errors = ?errors);
 
-    render_template(LoginTemplate { errors })
+    Ok((jar, render_template(LoginTemplate { errors })?))
 }
 
 #[derive(Debug, Deserialize)]
