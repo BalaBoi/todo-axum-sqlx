@@ -15,7 +15,7 @@ use axum_extra::extract::CookieJar;
 use secrecy::{ExposeSecret, SecretString};
 use serde::Deserialize;
 use sqlx::PgPool;
-use tracing::debug;
+use tracing::{debug, instrument};
 
 use crate::{
     error::{Error, ResultExt},
@@ -35,7 +35,7 @@ pub fn router() -> Router<ApiState> {
 #[template(path = "register.html")]
 struct RegisterTemplate;
 
-#[tracing::instrument]
+#[instrument]
 async fn register_page() -> impl IntoResponse {
     Html(RegisterTemplate.render().unwrap())
 }
@@ -46,7 +46,7 @@ struct LoginTemplate {
     errors: Option<String>,
 }
 
-#[tracing::instrument]
+#[instrument]
 async fn login_page(
     State(hmac_key): State<HmacKey>,
     jar: CookieJar,
@@ -65,7 +65,7 @@ struct CreateUser {
     password: SecretString,
 }
 
-#[tracing::instrument(skip_all, fields(
+#[instrument(skip_all, fields(
     action = "registering a user",
     username = create_user.username,
     email = create_user.email
@@ -121,7 +121,7 @@ struct UpdateUser {
     new_password: SecretString,
 }
 
-#[tracing::instrument(skip_all)]
+#[instrument(skip_all)]
 async fn update_user(
     State(api_state): State<ApiState>,
     Json(user_update): Json<UpdateUser>,
@@ -184,7 +184,7 @@ struct Credentials {
     password: SecretString,
 }
 
-#[tracing::instrument(skip_all)]
+#[instrument(skip_all)]
 async fn login_user(
     State(state): State<ApiState>,
     Form(credentials): Form<Credentials>,

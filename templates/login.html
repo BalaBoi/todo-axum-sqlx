@@ -84,20 +84,16 @@
 <body>
   <div class="container">
     <h1>Login</h1>
-    
-    {% if let Some(error) = errors %}
+    {%- if let Some(error) = errors %}
     <div class="error-message">
       {{ error }}
     </div>
-    {% endif %}
-    
+    {% endif -%}
     <form action="/users/login" method="post">
       <label for="email">Email:</label>
       <input type="email" id="email" name="email" required />
-
       <label for="password">Password:</label>
       <input type="password" id="password" name="password" required />
-
       <button type="submit">Log In</button>
     </form>
     <p>
