@@ -1,28 +1,15 @@
 use anyhow::Context;
-use argon2::{
-    password_hash::{rand_core::OsRng, SaltString},
-    Argon2, PasswordHasher,
-};
 use askama::Template;
-use axum::{
-    extract::State,
-    http::StatusCode,
-    response::{Html, IntoResponse, Redirect},
-    routing::get,
-    Form, Json, Router,
-};
 use secrecy::{ExposeSecret, SecretString};
-use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use time::OffsetDateTime;
 use tower_sessions::Session;
 use tracing::{debug, instrument};
-use uuid::Uuid;
+use axum::{extract::State, http::StatusCode, response::{Html, IntoResponse, Redirect}, routing::{get, Router}, Form, Json};
+use serde::Deserialize;
 
-use crate::{
-    error::{Error, ResultExt},
-    utilities::{render_template, ApiState, FlashMessage, FlashMessageLevel, Result},
-};
+use crate::{error::{Error, ResultExt}, utilities::{render_template, ApiState, FlashMessage, FlashMessageLevel, Result}};
+
+use super::{hash_password, UserSession, templates::*, User};
 
 pub fn router() -> Router<ApiState> {
     Router::new()
@@ -31,21 +18,6 @@ pub fn router() -> Router<ApiState> {
             get(register_page).post(register_user).put(update_user),
         )
         .route("/login", get(login_page).post(login_user))
-}
-
-#[derive(Template)]
-#[template(path = "register.html")]
-struct RegisterTemplate;
-
-#[instrument]
-async fn register_page() -> impl IntoResponse {
-    Html(RegisterTemplate.render().unwrap())
-}
-
-#[derive(Template)]
-#[template(path = "login.html")]
-struct LoginTemplate {
-    errors: Option<String>,
 }
 
 #[instrument]
@@ -64,9 +36,12 @@ async fn login_page(session: Session) -> Result<Html<String>> {
 
     debug!(flash_errors = ?error_flash);
 
-    render_template(LoginTemplate {
-        errors: error_flash,
-    })
+    render_template(LoginTemplate::new(error_flash))
+}
+
+#[instrument]
+async fn register_page() -> impl IntoResponse {
+    Html(RegisterTemplate.render().unwrap())
 }
 
 #[derive(Debug, Deserialize)]
@@ -109,21 +84,6 @@ async fn register_user(
     Ok((StatusCode::CREATED, Redirect::to("/users/login")))
 }
 
-async fn hash_password(password: &SecretString) -> Result<String> {
-    let current_span = tracing::Span::current();
-    let password = password.clone();
-    tokio::task::spawn_blocking(move || -> Result<String> {
-        current_span.in_scope(|| {
-            let salt = SaltString::generate(&mut OsRng);
-            Ok(Argon2::default()
-                .hash_password(password.expose_secret().as_bytes(), &salt)
-                .context("Failed to generate password hash")?
-                .to_string())
-        })
-    })
-    .await
-    .context("panic in spawned blocking thread for hashing")?
-}
 
 #[derive(Debug, Deserialize)]
 struct UpdateUser {
@@ -181,6 +141,7 @@ async fn update_user(
     Ok(())
 }
 
+
 #[derive(Debug, Deserialize)]
 struct Credentials {
     email: String,
@@ -233,23 +194,4 @@ async fn login_user(
     Err(Error::Unauthorized)
 }
 
-#[derive(Debug)]
-#[allow(dead_code)]
-struct User {
-    user_id: Uuid,
-    email: String,
-    username: String,
-    password_hash: SecretString,
-    updated_at: OffsetDateTime,
-    created_at: OffsetDateTime,
-}
 
-#[derive(Debug, Serialize, Deserialize)]
-struct UserSession {
-    user_id: Uuid,
-    username: String,
-}
-
-impl UserSession {
-    const SESSION_KEY: &str = "user_session";
-}
