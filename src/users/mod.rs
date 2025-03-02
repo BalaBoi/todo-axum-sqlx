@@ -5,9 +5,9 @@ use argon2::{
 };
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
-use time::OffsetDateTime;
 use uuid::Uuid;
 
+mod db;
 mod routes;
 mod templates;
 
@@ -29,17 +29,6 @@ async fn hash_password(password: &SecretString) -> Result<String> {
     })
     .await
     .context("panic in spawned blocking thread for hashing")?
-}
-
-#[derive(Debug)]
-#[allow(dead_code)]
-struct User {
-    user_id: Uuid,
-    email: String,
-    username: String,
-    password_hash: SecretString,
-    updated_at: OffsetDateTime,
-    created_at: OffsetDateTime,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
