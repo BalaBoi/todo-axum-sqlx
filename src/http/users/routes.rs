@@ -14,7 +14,7 @@ use tracing::{debug, instrument};
 
 use super::super::{
     error::Error,
-    utilities::{render_template, ApiState, FlashMessages, FlashMessageLevel, Result},
+    utilities::{render_template, ApiState, FlashMessageLevel, FlashMessages, Result},
 };
 
 use super::{db, hash_password, templates::*, UserSession};
@@ -109,6 +109,8 @@ async fn login_user(
             return Ok(Redirect::to("/todo"));
         }
     }
-    flash_msgs.set_msg(FlashMessageLevel::Error, "Incorrect Credentials").await?;
+    flash_msgs
+        .set_msg(FlashMessageLevel::Error, "Incorrect Credentials")
+        .await?;
     Err(Error::Unauthorized)
 }

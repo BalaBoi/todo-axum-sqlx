@@ -1,7 +1,7 @@
 mod config;
-mod logging;
 mod http;
+mod logging;
 
-pub use http::serve_app;
 pub use config::get_config;
+pub use http::serve_app;
 pub use logging::init_tracing_subscriber;

@@ -1,16 +1,14 @@
 #![allow(dead_code)]
-use std::net::SocketAddr;
 use reqwest::Response;
 use serde::Serialize;
 use sqlx::PgPool;
-use todo_web_app::{
-    get_config, serve_app
-};
+use std::net::SocketAddr;
+use todo_web_app::{get_config, serve_app};
 use tokio::net::TcpListener;
 
 pub struct TestApp {
     pub client: reqwest::Client,
-    pub address: SocketAddr
+    pub address: SocketAddr,
 }
 
 impl TestApp {
@@ -32,7 +30,7 @@ impl TestApp {
                 .cookie_store(true)
                 .build()
                 .expect("should be able to build client"),
-            address: addr
+            address: addr,
         }
     }
 

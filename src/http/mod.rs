@@ -16,12 +16,13 @@ mod tasks;
 mod users;
 pub mod utilities;
 
-pub async fn serve_app(config: Settings, pool: PgPool, listener: TcpListener) -> anyhow::Result<()> {
+pub async fn serve_app(
+    config: Settings,
+    pool: PgPool,
+    listener: TcpListener,
+) -> anyhow::Result<()> {
     trace!("constructing ApiState");
-    let state = ApiState::new(
-        pool,
-        HmacKey(config.application.hmac_key.clone()),
-    );
+    let state = ApiState::new(pool, HmacKey(config.application.hmac_key.clone()));
 
     trace!("making api_router");
     let app = api_router(state);
