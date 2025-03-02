@@ -2,7 +2,9 @@ use anyhow::Context;
 use askama::Template;
 use axum::{response::IntoResponse, routing::get, Router};
 use tokio::net::TcpListener;
+use tower::ServiceBuilder;
 use tower_http::trace::TraceLayer;
+use tower_sessions::{MemoryStore, SessionManagerLayer};
 use tracing::{info, instrument, trace};
 use utilities::{render_template, ApiState, HmacKey};
 
@@ -44,10 +46,16 @@ async fn home_page() -> impl IntoResponse {
 }
 
 pub fn api_router(state: ApiState) -> Router {
+    let session_store = MemoryStore::default();
+    let session_layer = SessionManagerLayer::new(session_store).with_secure(false);
     Router::new()
         .route("/", get(home_page))
         .nest("/todo", tasks::router())
         .nest("/users", users::router())
         .with_state(state)
-        .layer(TraceLayer::new_for_http())
+        .layer(
+            ServiceBuilder::new()
+                .layer(TraceLayer::new_for_http())
+                .layer(session_layer),
+        )
 }

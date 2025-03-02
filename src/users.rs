@@ -11,15 +11,17 @@ use axum::{
     routing::get,
     Form, Json, Router,
 };
-use axum_extra::extract::CookieJar;
 use secrecy::{ExposeSecret, SecretString};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
+use time::OffsetDateTime;
+use tower_sessions::Session;
 use tracing::{debug, instrument};
+use uuid::Uuid;
 
 use crate::{
     error::{Error, ResultExt},
-    utilities::{get_flash_errors, render_template, ApiState, FlashMessage, HmacKey, Result},
+    utilities::{render_template, ApiState, FlashMessage, FlashMessageLevel, Result},
 };
 
 pub fn router() -> Router<ApiState> {
@@ -47,15 +49,24 @@ struct LoginTemplate {
 }
 
 #[instrument]
-async fn login_page(
-    State(hmac_key): State<HmacKey>,
-    jar: CookieJar,
-) -> Result<(CookieJar, Html<String>)> {
-    let (jar, errors) = get_flash_errors(jar, &hmac_key)?;
+async fn login_page(session: Session) -> Result<Html<String>> {
+    let error_flash = match session
+        .get(FlashMessage::SESSION_KEY)
+        .await
+        .context("Session store error")?
+    {
+        Some(FlashMessage {
+            level: FlashMessageLevel::Error,
+            msg,
+        }) => Some(msg),
+        _ => None,
+    };
 
-    debug!(flash_errors = ?errors);
+    debug!(flash_errors = ?error_flash);
 
-    Ok((jar, render_template(LoginTemplate { errors })?))
+    render_template(LoginTemplate {
+        errors: error_flash,
+    })
 }
 
 #[derive(Debug, Deserialize)]
@@ -137,18 +148,10 @@ async fn update_user(
     )
     .fetch_optional(&api_state.pool)
     .await?
-    .ok_or_else(|| {
-        Error::Unauthorized(FlashMessage::new(
-            "Incorrect Credentials",
-            &api_state.hmac_key,
-        ))
-    })?;
+    .ok_or_else(|| Error::Unauthorized)?;
 
     if retrieved_record.password_hash != password_hash {
-        return Err(Error::Unauthorized(FlashMessage::new(
-            "Incorrect Credentials",
-            &api_state.hmac_key,
-        )));
+        return Err(Error::Unauthorized);
     }
 
     let new_password_hash = hash_password(&user_update.new_password).await?;
@@ -184,14 +187,16 @@ struct Credentials {
     password: SecretString,
 }
 
-#[instrument(skip_all)]
+#[instrument(skip_all, fields(?session))]
 async fn login_user(
     State(state): State<ApiState>,
+    session: Session,
     Form(credentials): Form<Credentials>,
 ) -> impl IntoResponse {
     let password_hash = hash_password(&credentials.password).await?;
 
-    let retrieved_record = sqlx::query!(
+    if let Some(user) = sqlx::query_as!(
+        User,
         r#"
         select * from users
         where email = $1
@@ -200,16 +205,51 @@ async fn login_user(
     )
     .fetch_optional(&state.pool)
     .await?
-    .ok_or_else(|| {
-        Error::Unauthorized(FlashMessage::new("Incorrect Credentials", &state.hmac_key))
-    })?;
-
-    if password_hash == retrieved_record.password_hash {
-        Ok(Redirect::to("/todo")) //Figure out how to do sessions here
-    } else {
-        Err(Error::Unauthorized(FlashMessage::new(
-            "Incorrect Credentials",
-            &state.hmac_key,
-        )))
+    {
+        if user.password_hash.expose_secret().eq(&password_hash) {
+            session
+                .insert(
+                    UserSession::SESSION_KEY,
+                    UserSession {
+                        user_id: user.user_id,
+                        username: user.username,
+                    },
+                )
+                .await
+                .context("session error")?;
+            return Ok(Redirect::to("/todo"));
+        }
     }
+    session
+        .insert(
+            FlashMessage::SESSION_KEY,
+            FlashMessage {
+                level: FlashMessageLevel::Error,
+                msg: String::from("Incorrect Credentials"),
+            },
+        )
+        .await
+        .context("session store error")?;
+    Err(Error::Unauthorized)
+}
+
+#[derive(Debug)]
+#[allow(dead_code)]
+struct User {
+    user_id: Uuid,
+    email: String,
+    username: String,
+    password_hash: SecretString,
+    updated_at: OffsetDateTime,
+    created_at: OffsetDateTime,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct UserSession {
+    user_id: Uuid,
+    username: String,
+}
+
+impl UserSession {
+    const SESSION_KEY: &str = "user_session";
 }

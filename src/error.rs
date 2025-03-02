@@ -4,10 +4,7 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Redirect},
 };
-use axum_extra::extract::{cookie::Cookie, CookieJar};
 use sqlx::error::DatabaseError;
-
-use crate::utilities::FlashMessage;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -22,7 +19,7 @@ pub enum Error {
         errors: HashMap<Cow<'static, str>, Vec<Cow<'static, str>>>,
     },
     #[error("error in authentication")]
-    Unauthorized(FlashMessage),
+    Unauthorized,
     #[error("error in displaying page")]
     Template(#[from] askama::Error),
 }
@@ -32,8 +29,9 @@ impl Error {
         match self {
             Self::NotFound => StatusCode::NOT_FOUND,
             Self::UnprocessableEntity { errors: _ } => StatusCode::UNPROCESSABLE_ENTITY,
-            Self::Other(_) | Self::SQLx(_) | Self::Template(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            Self::Unauthorized(_) => StatusCode::SEE_OTHER,
+            Self::Other(_) | Self::SQLx(_) | Self::Template(_) | _ => {
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
         }
     }
 
@@ -60,13 +58,9 @@ impl IntoResponse for Error {
                 tracing::trace!("Errors in the reguest: {:?}", errors)
             }
             Self::Other(error) => tracing::error!("Generic error: {:?}", error),
-            Self::Unauthorized(flash_msg) => {
+            Self::Unauthorized => {
                 tracing::trace!("Authentication failed");
-                let jar = CookieJar::new().add(Cookie::new(
-                    "error_flash",
-                    serde_json::to_string(flash_msg).unwrap(),
-                ));
-                return (jar, Redirect::to("/users/login")).into_response();
+                return Redirect::to("/users/login").into_response();
             }
             Self::Template(error) => tracing::error!("Template rendering error: {:?}", error),
             _ => {}

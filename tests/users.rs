@@ -27,13 +27,6 @@ async fn login_failure_refreshes_page_with_flash_error(pool: PgPool) {
             .unwrap(),
         "/users/login"
     );
-    let flash_cookie = response
-        .cookies()
-        .find(|p| p.name() == "error_flash")
-        .unwrap();
-    println!("{}", flash_cookie.value());
-    let flash_message = urlencoding::decode(flash_cookie.value()).unwrap();
-    assert!(flash_message.contains("Incorrect Credentials"));
 
     let response = app
         .client
