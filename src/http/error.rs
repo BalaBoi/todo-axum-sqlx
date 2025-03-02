@@ -22,6 +22,8 @@ pub enum Error {
     Unauthorized,
     #[error("error in displaying page")]
     Template(#[from] askama::Error),
+    #[error("an internal server error occurred")]
+    Session(#[from] tower_sessions::session::Error),
 }
 
 impl Error {
@@ -63,6 +65,7 @@ impl IntoResponse for Error {
                 return Redirect::to("/users/login").into_response();
             }
             Self::Template(error) => tracing::error!("Template rendering error: {:?}", error),
+            Self::Session(error) => tracing::error!("Error in session middleware: {:?}", error),
             _ => {}
         };
         (self.status_code(), self.to_string()).into_response()

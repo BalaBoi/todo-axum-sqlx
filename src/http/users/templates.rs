@@ -7,11 +7,11 @@ pub struct RegisterTemplate;
 #[derive(Template)]
 #[template(path = "login.html")]
 pub struct LoginTemplate {
-    errors: Option<String>,
+    errors: String,
 }
 
 impl LoginTemplate {
-    pub fn new(errors: Option<String>) -> Self {
+    pub fn new(errors: String) -> Self {
         Self { errors }
     }
 }

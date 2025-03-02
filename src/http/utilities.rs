@@ -1,8 +1,10 @@
+use anyhow::anyhow;
 use askama::Template;
-use axum::{extract::FromRef, response::Html};
+use axum::{extract::{FromRef, FromRequestParts}, http::request::Parts, response::Html};
 use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
+use tower_sessions::Session;
 
 use super::error::Error;
 
@@ -30,18 +32,69 @@ where
     Ok(Html(template.render()?))
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FlashMessage {
     pub level: FlashMessageLevel,
     pub msg: String,
 }
 
-impl FlashMessage {
-    pub const SESSION_KEY: &str = "flash_message";
-}
-
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub enum FlashMessageLevel {
     Error,
     Success,
+}
+
+pub struct FlashMessages {
+    session: Session,
+    msgs: Vec<FlashMessage>
+}
+
+impl FlashMessages {
+    const SESSION_KEY: &'static str = "flash_messages";
+
+    async fn update_session(&self) -> Result<()> {
+        self
+            .session
+            .insert(Self::SESSION_KEY, self.msgs.clone())
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn set_msg(&mut self, level: FlashMessageLevel, msg: &str) -> Result<()> {
+        self.msgs.push(FlashMessage { level, msg: msg.to_string() });
+        self.update_session().await
+    }
+
+    pub async fn get_msgs(&mut self) -> Result<Vec<FlashMessage>> {
+        let out = std::mem::replace(&mut self.msgs, Vec::new());
+        self.update_session().await?;
+        Ok(out)
+    }
+}
+
+impl<S> FromRequestParts<S> for FlashMessages 
+where 
+    S: Send + Sync
+{
+    type Rejection = Error;
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self,Self::Rejection> {
+        let session = Session::from_request_parts(parts, state)
+            .await
+            .map_err(|_| Error::Other(anyhow!("Session manager layer seems to not be present")))?;
+
+        let flash_msgs_vec = session.get(Self::SESSION_KEY)
+            .await?
+            .unwrap_or_default();
+
+        let flash_msgs = Self {
+            session,
+            msgs: flash_msgs_vec
+        };
+
+        flash_msgs.update_session().await?;
+        
+        Ok(flash_msgs)
+    }
 }

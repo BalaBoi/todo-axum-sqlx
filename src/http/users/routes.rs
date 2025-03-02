@@ -14,7 +14,7 @@ use tracing::{debug, instrument};
 
 use super::super::{
     error::Error,
-    utilities::{render_template, ApiState, FlashMessage, FlashMessageLevel, Result},
+    utilities::{render_template, ApiState, FlashMessages, FlashMessageLevel, Result},
 };
 
 use super::{db, hash_password, templates::*, UserSession};
@@ -25,19 +25,20 @@ pub fn router() -> Router<ApiState> {
         .route("/login", get(login_page).post(login_user))
 }
 
-#[instrument]
-async fn login_page(session: Session) -> Result<Html<String>> {
-    let error_flash = match session
-        .get(FlashMessage::SESSION_KEY)
-        .await
-        .context("Session store error")?
-    {
-        Some(FlashMessage {
-            level: FlashMessageLevel::Error,
-            msg,
-        }) => Some(msg),
-        _ => None,
-    };
+#[instrument(skip_all)]
+async fn login_page(mut flash_msgs: FlashMessages) -> Result<Html<String>> {
+    let error_flash = flash_msgs
+        .get_msgs()
+        .await?
+        .iter()
+        .filter_map(|f| {
+            if f.level == FlashMessageLevel::Error {
+                Some(f.msg.clone())
+            } else {
+                None
+            }
+        })
+        .collect::<String>();
 
     debug!(flash_errors = ?error_flash);
 
@@ -88,6 +89,7 @@ struct Credentials {
 async fn login_user(
     State(pool): State<PgPool>,
     session: Session,
+    mut flash_msgs: FlashMessages,
     Form(credentials): Form<Credentials>,
 ) -> impl IntoResponse {
     let password_hash = hash_password(&credentials.password).await?;
@@ -107,15 +109,6 @@ async fn login_user(
             return Ok(Redirect::to("/todo"));
         }
     }
-    session
-        .insert(
-            FlashMessage::SESSION_KEY,
-            FlashMessage {
-                level: FlashMessageLevel::Error,
-                msg: String::from("Incorrect Credentials"),
-            },
-        )
-        .await
-        .context("session store error")?;
+    flash_msgs.set_msg(FlashMessageLevel::Error, "Incorrect Credentials").await?;
     Err(Error::Unauthorized)
 }
