@@ -4,7 +4,7 @@ use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 
-use crate::error::Error;
+use super::error::Error;
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 

@@ -13,7 +13,7 @@ mod templates;
 
 pub use routes::router;
 
-use crate::utilities::Result;
+use super::utilities::Result;
 
 async fn hash_password(password: &SecretString) -> Result<String> {
     let current_span = tracing::Span::current();

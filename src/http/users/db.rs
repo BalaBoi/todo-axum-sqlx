@@ -3,8 +3,8 @@ use sqlx::PgPool;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-use crate::error::{Error, ResultExt};
-use crate::utilities::Result;
+use super::super::error::{Error, ResultExt};
+use super::super::utilities::Result;
 
 pub async fn insert_user(
     pool: &PgPool,

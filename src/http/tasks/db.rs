@@ -3,7 +3,7 @@ use time::OffsetDateTime;
 use tracing::instrument;
 use uuid::Uuid;
 
-use crate::{error::Error, utilities::Result};
+use super::super::{error::Error, utilities::Result};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Task {

@@ -1,31 +1,21 @@
 #![allow(dead_code)]
-use std::future::IntoFuture;
 use std::net::SocketAddr;
-
 use reqwest::Response;
-use secrecy::SecretString;
 use serde::Serialize;
 use sqlx::PgPool;
 use todo_web_app::{
-    api_router,
-    utilities::{ApiState, HmacKey},
+    get_config, serve_app
 };
 use tokio::net::TcpListener;
-use uuid::Uuid;
 
 pub struct TestApp {
     pub client: reqwest::Client,
-    pub address: SocketAddr,
-    pub hmac_key: String,
+    pub address: SocketAddr
 }
 
 impl TestApp {
     pub async fn new(pool: PgPool) -> Self {
-        let test_hmac_key = Uuid::new_v4().to_string();
-        let state = ApiState {
-            pool,
-            hmac_key: HmacKey(SecretString::from(test_hmac_key.as_str())),
-        };
+        let config = get_config();
 
         let listener = TcpListener::bind("localhost:0")
             .await
@@ -34,7 +24,7 @@ impl TestApp {
             .local_addr()
             .expect("should be able to get the local address");
 
-        let _ = tokio::spawn(axum::serve(listener, api_router(state)).into_future());
+        let _ = tokio::spawn(serve_app(config, pool, listener));
 
         Self {
             client: reqwest::ClientBuilder::new()
@@ -42,8 +32,7 @@ impl TestApp {
                 .cookie_store(true)
                 .build()
                 .expect("should be able to build client"),
-            address: addr,
-            hmac_key: test_hmac_key,
+            address: addr
         }
     }
 
