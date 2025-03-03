@@ -153,6 +153,43 @@
       font-style: italic;
       color: #6c757d;
     }
+    /* New styles for header section with greeting and logout */
+    .header-section {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5em;
+      padding-bottom: 1em;
+      border-bottom: 1px solid #eee;
+    }
+    .greeting {
+      font-size: 1.1em;
+      color: #333;
+    }
+    .username {
+      font-weight: bold;
+      color: #007acc;
+    }
+    .logout-button {
+      padding: 0.5em 1em;
+      background: #f8f9fa;
+      color: #6c757d;
+      border: 1px solid #dee2e6;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.9em;
+      transition: all 0.2s ease;
+    }
+    .logout-button:hover {
+      background: #e9ecef;
+      color: #495057;
+    }
+    .action-area {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5em;
+    }
   </style>
   <script>
     // Function to delete a todo
@@ -173,6 +210,13 @@
           alert('An error occurred while trying to delete the todo.');
         });
       }
+    }
+
+    // Function to handle logout
+    function logout() {
+      // Here we would typically make a request to logout endpoint
+      // For now, redirect to home page
+      window.location.href = "/users/logout";
     }
 
     // Function to organize todos when the page loads
@@ -234,9 +278,20 @@
 </head>
 <body>
   <div class="container">
+    <!-- New header section with greeting and logout -->
+    <div class="header-section">
+      <div class="greeting">
+        Hello <span class="username">{{ username }}</span>!
+      </div>
+      <button class="logout-button" onclick="logout()">Logout</button>
+    </div>
+
     <h1>Your Todos</h1>
-    <div class="new-todo">
-      <a href="/todo/new"><button>Create New Todo</button></a>
+
+    <div class="action-area">
+      <div class="new-todo">
+        <a href="/todo/new"><button>Create New Todo</button></a>
+      </div>
     </div>
 
     <!-- Pending Tasks Section -->

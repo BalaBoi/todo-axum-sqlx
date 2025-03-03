@@ -23,6 +23,7 @@ pub fn router() -> Router<ApiState> {
     Router::new()
         .route("/register", get(register_page).post(register_user))
         .route("/login", get(login_page).post(login_user))
+        .route("/logout", get(logout_user))
 }
 
 #[instrument(skip_all)]
@@ -106,4 +107,11 @@ async fn login_user(
         .set_msg(FlashMessageLevel::Error, "Incorrect Credentials")
         .await?;
     Err(Error::Unauthorized)
+}
+
+#[instrument(skip_all)]
+async fn logout_user(session: Session) -> Result<Redirect> {
+    session.delete().await?;
+    session.cycle_id().await?;
+    Ok(Redirect::to("/"))
 }
