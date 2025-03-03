@@ -13,17 +13,24 @@ pub struct Task {
     pub completed: bool,
     pub created_at: OffsetDateTime,
     pub updated_at: OffsetDateTime,
+    pub user_id: Uuid,
 }
 
 #[instrument]
-pub async fn create_new_task(pool: &PgPool, title: &str, description: &str) -> Result<()> {
+pub async fn create_new_task(
+    pool: &PgPool,
+    title: &str,
+    description: &str,
+    user_id: Uuid,
+) -> Result<()> {
     sqlx::query!(
         r#"
-        insert into task (title, description)
-        values ($1, $2)
+        insert into task (title, description, user_id)
+        values ($1, $2, $3)
         "#,
         title,
-        description
+        description,
+        user_id
     )
     .execute(pool)
     .await?;
@@ -50,12 +57,14 @@ pub async fn delete_task(pool: &PgPool, task_id: Uuid) -> Result<()> {
 }
 
 #[instrument]
-pub async fn get_all_tasks(pool: &PgPool) -> Result<Vec<Task>> {
+pub async fn get_all_tasks(pool: &PgPool, user_id: Uuid) -> Result<Vec<Task>> {
     sqlx::query_as!(
         Task,
         r#"
         select * from task
-        "#
+        where user_id = $1
+        "#,
+        user_id
     )
     .fetch_all(pool)
     .await

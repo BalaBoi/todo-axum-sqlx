@@ -1,5 +1,7 @@
 use axum::{
-    middleware::from_fn, routing::{delete, get, post}, Router
+    middleware::from_fn,
+    routing::{delete, get, post},
+    Router,
 };
 
 use crate::http::users::auth;

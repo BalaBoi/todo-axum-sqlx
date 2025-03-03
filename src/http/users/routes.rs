@@ -17,7 +17,7 @@ use super::super::{
     utilities::{render_template, ApiState, FlashMessageLevel, FlashMessages, Result},
 };
 
-use super::{db, hash_password, templates::*, session::SessionExt};
+use super::{db, hash_password, session::SessionExt, templates::*};
 
 pub fn router() -> Router<ApiState> {
     Router::new()
@@ -92,7 +92,7 @@ async fn login_user(
     Form(credentials): Form<Credentials>,
 ) -> impl IntoResponse {
     debug!(user_password = ?credentials.password.expose_secret());
-    
+
     if let Some(user) = db::get_user_by_email(&pool, &credentials.email).await? {
         debug!("user in db");
         if verify_password(&credentials.password, &user.password_hash).await? {

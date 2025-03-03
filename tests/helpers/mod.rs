@@ -3,10 +3,10 @@ use reqwest::{Response, StatusCode};
 use serde::Serialize;
 use serde_json::json;
 use sqlx::PgPool;
-use uuid::Uuid;
 use std::net::SocketAddr;
 use todo_web_app::{get_config, serve_app};
 use tokio::net::TcpListener;
+use uuid::Uuid;
 
 pub struct TestApp {
     pub client: reqwest::Client,
@@ -84,7 +84,8 @@ impl TestApp {
             "username": &test_user.username
         });
 
-        let response = self.client
+        let response = self
+            .client
             .post(self.route_url("/users/register"))
             .form(&register_form)
             .send()
@@ -92,13 +93,22 @@ impl TestApp {
             .expect("could not post registration form");
 
         assert_eq!(response.status(), StatusCode::SEE_OTHER);
-        assert_eq!(response.headers().get("location").unwrap().to_str().unwrap(), "/users/login");
-        
+        assert_eq!(
+            response
+                .headers()
+                .get("location")
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            "/users/login"
+        );
+
         test_user
     }
 
     pub async fn login_test_user(&self, test_user: &TestUser) {
-        let response = self.client
+        let response = self
+            .client
             .post(self.route_url("/users/login"))
             .form(&json!({
                 "email": &test_user.email,
@@ -107,8 +117,16 @@ impl TestApp {
             .send()
             .await
             .expect("could not post login form");
-        
+
         assert_eq!(response.status(), StatusCode::SEE_OTHER);
-        assert_eq!(response.headers().get("location").unwrap().to_str().unwrap(), "/todo");
+        assert_eq!(
+            response
+                .headers()
+                .get("location")
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            "/todo"
+        );
     }
 }

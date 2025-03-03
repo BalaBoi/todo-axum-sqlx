@@ -1,6 +1,7 @@
 use anyhow::Context;
 use argon2::{
-    password_hash::{rand_core::OsRng, SaltString}, Argon2, PasswordHash, PasswordHasher, PasswordVerifier
+    password_hash::{rand_core::OsRng, SaltString},
+    Argon2, PasswordHash, PasswordHasher, PasswordVerifier,
 };
 use secrecy::{ExposeSecret, SecretString};
 
@@ -10,7 +11,7 @@ mod session;
 mod templates;
 
 pub use routes::router;
-pub use session::auth;
+pub use session::{auth, UserSessionData};
 
 use super::{error::Error, utilities::Result};
 
@@ -36,13 +37,9 @@ async fn verify_password(password: &SecretString, password_hash: &SecretString) 
         .map_err(Error::Other)?;
 
     match Argon2::default()
-        .verify_password(
-            password.expose_secret().as_bytes(),
-            &argon_password_hash
-        )
+        .verify_password(password.expose_secret().as_bytes(), &argon_password_hash)
     {
         Ok(_) => Ok(true),
         Err(_) => Ok(false),
     }
-
 }

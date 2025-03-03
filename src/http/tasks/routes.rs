@@ -1,11 +1,13 @@
 use axum::{
     extract::{Path, State},
     response::{Html, Redirect},
-    Form,
+    Extension, Form,
 };
 use sqlx::PgPool;
 use tracing::instrument;
 use uuid::Uuid;
+
+use crate::http::users::UserSessionData;
 
 use super::super::{
     error::Error,
@@ -43,9 +45,16 @@ pub struct UpdateTask {
 )]
 pub async fn create_task(
     State(pool): State<PgPool>,
+    Extension(user_session): Extension<UserSessionData>,
     Form(new_task): Form<NewTask>,
 ) -> Result<Redirect> {
-    db::create_new_task(&pool, &new_task.title, &new_task.description).await?;
+    db::create_new_task(
+        &pool,
+        &new_task.title,
+        &new_task.description,
+        user_session.user_id(),
+    )
+    .await?;
 
     Ok(Redirect::to("/todo"))
 }
@@ -56,8 +65,11 @@ pub async fn delete_task(State(pool): State<PgPool>, Path(task_id): Path<Uuid>) 
 }
 
 #[instrument(skip_all, fields(action = "displaying tasks page"))]
-pub async fn tasks_page(State(pool): State<PgPool>) -> Result<Html<String>> {
-    let tasks = db::get_all_tasks(&pool).await?;
+pub async fn tasks_page(
+    State(pool): State<PgPool>,
+    Extension(user_session): Extension<UserSessionData>,
+) -> Result<Html<String>> {
+    let tasks = db::get_all_tasks(&pool, user_session.user_id()).await?;
 
     render_template(TodosTemplate { todos: tasks })
 }
