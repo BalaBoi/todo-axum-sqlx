@@ -1,5 +1,5 @@
 use anyhow::anyhow;
-use axum::{extract::FromRequestParts, http::request::Parts};
+use axum::{extract::{FromRequestParts, Request}, http::request::Parts, middleware::Next, response::Response};
 use serde::{Deserialize, Serialize};
 use tower_sessions::Session;
 use tracing::debug;
@@ -77,6 +77,17 @@ impl SessionExt for Session {
             username: user.username.clone()
         })
         .await?;
+        self.cycle_id().await?;
         Ok(())
+    }
+}
+
+pub async fn auth(session: Session, req: Request, next: Next) -> Result<Response> {
+    match session.get::<UserSessionData>(UserSession::SESSION_KEY).await? {
+        Some(_) => {
+            let response = next.run(req).await;
+            Ok(response)
+        },
+        None => Err(Error::Unauthorized)
     }
 }

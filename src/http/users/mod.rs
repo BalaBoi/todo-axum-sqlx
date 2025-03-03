@@ -10,7 +10,7 @@ mod session;
 mod templates;
 
 pub use routes::router;
-pub use session::UserSession;
+pub use session::auth;
 
 use super::{error::Error, utilities::Result};
 
