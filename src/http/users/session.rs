@@ -1,8 +1,4 @@
-use axum::{
-    extract::Request,
-    middleware::Next,
-    response::Response,
-};
+use axum::{extract::Request, middleware::Next, response::Response};
 use serde::{Deserialize, Serialize};
 use tower_sessions::Session;
 use tracing::debug;
@@ -50,7 +46,7 @@ impl SessionExt for Session {
     }
 }
 
-pub async fn auth(session: Session, mut req: Request, next: Next) -> Result<Response> {
+pub async fn auth_middleware(session: Session, mut req: Request, next: Next) -> Result<Response> {
     match session
         .get::<UserSessionData>(UserSessionData::SESSION_KEY)
         .await?

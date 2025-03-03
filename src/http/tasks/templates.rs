@@ -8,7 +8,8 @@ pub struct NewTodoTemplate;
 
 #[derive(Template)]
 #[template(path = "todos.html")]
-pub struct TodosTemplate {
+pub struct TodosTemplate<'a> {
+    pub username: &'a str,
     pub todos: Vec<Task>,
 }
 

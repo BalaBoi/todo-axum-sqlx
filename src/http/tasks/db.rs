@@ -1,6 +1,6 @@
 use sqlx::PgPool;
 use time::OffsetDateTime;
-use tracing::instrument;
+use tracing::{instrument, warn};
 use uuid::Uuid;
 
 use super::super::{error::Error, utilities::Result};
@@ -72,8 +72,8 @@ pub async fn get_all_tasks(pool: &PgPool, user_id: Uuid) -> Result<Vec<Task>> {
 }
 
 #[instrument]
-pub async fn get_task(pool: &PgPool, task_id: Uuid) -> Result<Option<Task>> {
-    sqlx::query_as!(
+pub async fn get_task(pool: &PgPool, task_id: Uuid, user_id: Uuid) -> Result<Option<Task>> {
+    let task = sqlx::query_as!(
         Task,
         r#"
         select * from task
@@ -82,14 +82,27 @@ pub async fn get_task(pool: &PgPool, task_id: Uuid) -> Result<Option<Task>> {
         task_id
     )
     .fetch_optional(pool)
-    .await
-    .map_err(Error::SQLx)
+    .await?;
+
+    if task.is_none() {
+        return Ok(None);
+    } else if task.as_ref().unwrap().user_id != user_id {
+        warn!(
+            ?task,
+            ?user_id,
+            "user trying to access todo of another user"
+        );
+        return Ok(None);
+    }
+
+    Ok(task)
 }
 
 #[instrument]
 pub async fn update_task(
     pool: &PgPool,
     task_id: Uuid,
+    user_id: Uuid,
     title: &str,
     description: &str,
     completed: bool,
@@ -97,13 +110,14 @@ pub async fn update_task(
     let query_result = sqlx::query!(
         r#"
         update task
-        set title = $2, description = $3, completed = $4
-        where task_id = $1
+        set title = $1, description = $2, completed = $3
+        where task_id = $4 and user_id = $5
         "#,
-        task_id,
         title,
         description,
-        completed
+        completed,
+        task_id,
+        user_id
     )
     .execute(pool)
     .await?;

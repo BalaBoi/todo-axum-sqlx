@@ -1,10 +1,8 @@
-use helpers::TestApp;
+use crate::helpers::TestApp;
 use reqwest::StatusCode;
 use serde_json::json;
 use sqlx::{test, PgPool};
 use uuid::Uuid;
-
-mod helpers;
 
 #[test]
 async fn login_failure_refreshes_page_with_flash_error(pool: PgPool) {

@@ -1,12 +1,10 @@
 use std::collections::HashMap;
 
+use crate::helpers::TestApp;
 use axum::http::HeaderValue;
-use helpers::TestApp;
 use reqwest::StatusCode;
 use sqlx::{test, PgPool};
 use uuid::Uuid;
-
-mod helpers;
 
 #[test]
 async fn creating_a_task_redirects_to_todo_with_the_task(pool: PgPool) {

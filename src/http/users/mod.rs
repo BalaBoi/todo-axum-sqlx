@@ -11,7 +11,7 @@ mod session;
 mod templates;
 
 pub use routes::router;
-pub use session::{auth, UserSessionData};
+pub use session::{auth_middleware, UserSessionData};
 
 use super::{error::Error, utilities::Result};
 
