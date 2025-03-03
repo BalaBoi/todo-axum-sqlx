@@ -7,6 +7,8 @@ use sqlx::PgPool;
 use tracing::instrument;
 use uuid::Uuid;
 
+use crate::http::users::UserSession;
+
 use super::super::{
     error::Error,
     utilities::{render_template, Result},
@@ -56,7 +58,7 @@ pub async fn delete_task(State(pool): State<PgPool>, Path(task_id): Path<Uuid>) 
 }
 
 #[instrument(skip_all, fields(action = "displaying tasks page"))]
-pub async fn tasks_page(State(pool): State<PgPool>) -> Result<Html<String>> {
+pub async fn tasks_page(State(pool): State<PgPool>, _user_session: UserSession) -> Result<Html<String>> {
     let tasks = db::get_all_tasks(&pool).await?;
 
     render_template(TodosTemplate { todos: tasks })

@@ -1,6 +1,5 @@
 use axum::{
     extract::State,
-    http::StatusCode,
     response::{Html, IntoResponse, Redirect},
     routing::{get, Router},
     Form,
@@ -11,12 +10,14 @@ use sqlx::PgPool;
 use tower_sessions::Session;
 use tracing::{debug, instrument};
 
+use crate::http::users::verify_password;
+
 use super::super::{
     error::Error,
     utilities::{render_template, ApiState, FlashMessageLevel, FlashMessages, Result},
 };
 
-use super::{db, hash_password, templates::*, UserSession};
+use super::{db, hash_password, templates::*, session::SessionExt};
 
 pub fn router() -> Router<ApiState> {
     Router::new()
@@ -64,9 +65,8 @@ struct CreateUser {
 async fn register_user(
     State(pool): State<PgPool>,
     Form(create_user): Form<CreateUser>,
-) -> Result<(StatusCode, Redirect)> {
+) -> Result<Redirect> {
     let password_hash = hash_password(&create_user.password).await?;
-
     db::insert_user(
         &pool,
         &create_user.email,
@@ -75,7 +75,7 @@ async fn register_user(
     )
     .await?;
 
-    Ok((StatusCode::CREATED, Redirect::to("/users/login")))
+    Ok(Redirect::to("/users/login"))
 }
 
 #[derive(Debug, Deserialize)]
@@ -84,29 +84,24 @@ struct Credentials {
     password: SecretString,
 }
 
-#[instrument(skip_all, fields(?session))]
+#[instrument(skip_all)]
 async fn login_user(
     State(pool): State<PgPool>,
     session: Session,
     mut flash_msgs: FlashMessages,
     Form(credentials): Form<Credentials>,
 ) -> impl IntoResponse {
-    let password_hash = hash_password(&credentials.password).await?;
-
+    debug!(user_password = ?credentials.password.expose_secret());
+    
     if let Some(user) = db::get_user_by_email(&pool, &credentials.email).await? {
-        if user.password_hash.expose_secret().eq(&password_hash) {
-            session
-                .insert(
-                    UserSession::SESSION_KEY,
-                    UserSession {
-                        user_id: user.user_id,
-                        username: user.username,
-                    },
-                )
-                .await?;
+        debug!("user in db");
+        if verify_password(&credentials.password, &user.password_hash).await? {
+            debug!("user authorized");
+            session.create_user_session(&user).await?;
             return Ok(Redirect::to("/todo"));
         }
     }
+    debug!("user unauthorized");
     flash_msgs
         .set_msg(FlashMessageLevel::Error, "Incorrect Credentials")
         .await?;

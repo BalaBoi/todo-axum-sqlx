@@ -31,9 +31,7 @@ impl Error {
         match self {
             Self::NotFound => StatusCode::NOT_FOUND,
             Self::UnprocessableEntity { errors: _ } => StatusCode::UNPROCESSABLE_ENTITY,
-            _ => {
-                StatusCode::INTERNAL_SERVER_ERROR
-            }
+            _ => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 

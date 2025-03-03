@@ -10,7 +10,9 @@ mod helpers;
 
 #[test]
 async fn creating_a_task_redirects_to_todo_with_the_task(pool: PgPool) {
-    let app = TestApp::new(pool).await;
+    let mut app = TestApp::new(pool).await;
+    let test_user = app.register_test_user().await;
+    app.login_test_user(&test_user).await;
 
     let mut task_create_body = HashMap::new();
     let title = Uuid::new_v4().to_string();

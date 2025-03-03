@@ -1,19 +1,18 @@
 use anyhow::Context;
 use argon2::{
-    password_hash::{rand_core::OsRng, SaltString},
-    Argon2, PasswordHasher,
+    password_hash::{rand_core::OsRng, SaltString}, Argon2, PasswordHash, PasswordHasher, PasswordVerifier
 };
 use secrecy::{ExposeSecret, SecretString};
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 mod db;
 mod routes;
+mod session;
 mod templates;
 
 pub use routes::router;
+pub use session::UserSession;
 
-use super::utilities::Result;
+use super::{error::Error, utilities::Result};
 
 async fn hash_password(password: &SecretString) -> Result<String> {
     let current_span = tracing::Span::current();
@@ -31,12 +30,19 @@ async fn hash_password(password: &SecretString) -> Result<String> {
     .context("panic in spawned blocking thread for hashing")?
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct UserSession {
-    user_id: Uuid,
-    username: String,
-}
+async fn verify_password(password: &SecretString, password_hash: &SecretString) -> Result<bool> {
+    let argon_password_hash = PasswordHash::new(password_hash.expose_secret())
+        .context("failed to parse password in phc format")
+        .map_err(Error::Other)?;
 
-impl UserSession {
-    const SESSION_KEY: &str = "user_session";
+    match Argon2::default()
+        .verify_password(
+            password.expose_secret().as_bytes(),
+            &argon_password_hash
+        )
+    {
+        Ok(_) => Ok(true),
+        Err(_) => Ok(false),
+    }
+
 }

@@ -1,7 +1,9 @@
 #![allow(dead_code)]
-use reqwest::Response;
+use reqwest::{Response, StatusCode};
 use serde::Serialize;
+use serde_json::json;
 use sqlx::PgPool;
+use uuid::Uuid;
 use std::net::SocketAddr;
 use todo_web_app::{get_config, serve_app};
 use tokio::net::TcpListener;
@@ -9,6 +11,12 @@ use tokio::net::TcpListener;
 pub struct TestApp {
     pub client: reqwest::Client,
     pub address: SocketAddr,
+}
+
+pub struct TestUser {
+    email: String,
+    password: String,
+    username: String,
 }
 
 impl TestApp {
@@ -53,5 +61,54 @@ impl TestApp {
             .send()
             .await
             .expect("could not send get request")
+    }
+
+    pub async fn get_todo(&self) -> Response {
+        self.client
+            .get(self.route_url("/todo"))
+            .send()
+            .await
+            .expect("could not send get request to /todo")
+    }
+
+    pub async fn register_test_user(&mut self) -> TestUser {
+        let test_user = TestUser {
+            email: Uuid::new_v4().to_string(),
+            password: Uuid::new_v4().to_string(),
+            username: Uuid::new_v4().to_string(),
+        };
+
+        let register_form = json!({
+            "email": &test_user.email,
+            "password": &test_user.password,
+            "username": &test_user.username
+        });
+
+        let response = self.client
+            .post(self.route_url("/users/register"))
+            .form(&register_form)
+            .send()
+            .await
+            .expect("could not post registration form");
+
+        assert_eq!(response.status(), StatusCode::SEE_OTHER);
+        assert_eq!(response.headers().get("location").unwrap().to_str().unwrap(), "/users/login");
+        
+        test_user
+    }
+
+    pub async fn login_test_user(&self, test_user: &TestUser) {
+        let response = self.client
+            .post(self.route_url("/users/login"))
+            .form(&json!({
+                "email": &test_user.email,
+                "password": &test_user.password
+            }))
+            .send()
+            .await
+            .expect("could not post login form");
+        
+        assert_eq!(response.status(), StatusCode::SEE_OTHER);
+        assert_eq!(response.headers().get("location").unwrap().to_str().unwrap(), "/todo");
     }
 }
