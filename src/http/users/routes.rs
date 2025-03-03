@@ -1,4 +1,3 @@
-use anyhow::Context;
 use axum::{
     extract::State,
     http::StatusCode,
@@ -104,8 +103,7 @@ async fn login_user(
                         username: user.username,
                     },
                 )
-                .await
-                .context("session error")?;
+                .await?;
             return Ok(Redirect::to("/todo"));
         }
     }

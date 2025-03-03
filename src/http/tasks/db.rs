@@ -59,7 +59,7 @@ pub async fn get_all_tasks(pool: &PgPool) -> Result<Vec<Task>> {
     )
     .fetch_all(pool)
     .await
-    .map_err(|e| Error::SQLx(e))
+    .map_err(Error::SQLx)
 }
 
 #[instrument]
@@ -74,7 +74,7 @@ pub async fn get_task(pool: &PgPool, task_id: Uuid) -> Result<Option<Task>> {
     )
     .fetch_optional(pool)
     .await
-    .map_err(|e| Error::SQLx(e))
+    .map_err(Error::SQLx)
 }
 
 #[instrument]

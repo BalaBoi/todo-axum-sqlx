@@ -73,7 +73,7 @@ impl FlashMessages {
     }
 
     pub async fn get_msgs(&mut self) -> Result<Vec<FlashMessage>> {
-        let out = std::mem::replace(&mut self.msgs, Vec::new());
+        let out = std::mem::take(&mut self.msgs);
         self.update_session().await?;
         Ok(out)
     }
