@@ -97,7 +97,7 @@ This application was built as a learning project to understand:
 1. Clone the repository:
    ```bash
    git clone <repository-url>
-   cd todo_web_app
+   cd todo-axum-sqlx
    ```
 
 2. Create a `.env` file in the project root with the following configuration:
