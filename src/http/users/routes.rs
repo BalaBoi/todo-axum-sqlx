@@ -31,15 +31,12 @@ async fn login_page(mut flash_msgs: FlashMessages) -> Result<Html<String>> {
     let error_flash = flash_msgs
         .get_msgs()
         .await?
-        .iter()
-        .filter_map(|f| {
-            if f.level == FlashMessageLevel::Error {
-                Some(f.msg.clone())
-            } else {
-                None
-            }
-        })
-        .collect::<String>();
+        .into_iter()
+        .find_map(|fm| if fm.level == FlashMessageLevel::Error {
+            Some(fm.msg)
+        } else {
+            None
+        });
 
     debug!(flash_errors = ?error_flash);
 
