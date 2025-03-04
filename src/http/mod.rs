@@ -1,12 +1,17 @@
 use anyhow::Context;
 use askama::Template;
-use axum::{response::IntoResponse, routing::get, Router};
+use axum::{
+    http::{HeaderName, Request},
+    response::IntoResponse,
+    routing::get,
+    Router,
+};
 use sqlx::PgPool;
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
-use tower_http::trace::TraceLayer;
+use tower_http::{request_id::MakeRequestUuid, trace::TraceLayer, ServiceBuilderExt};
 use tower_sessions::{MemoryStore, SessionManagerLayer};
-use tracing::{info, instrument, trace};
+use tracing::{info, info_span, instrument, trace};
 use utilities::{render_template, ApiState, HmacKey};
 
 use crate::config::Settings;
@@ -15,6 +20,8 @@ mod error;
 mod tasks;
 mod users;
 pub mod utilities;
+
+const REQUEST_ID_HEADER: &'static str = "todo-request-id";
 
 pub async fn serve_app(
     config: Settings,
@@ -43,6 +50,7 @@ async fn home_page() -> impl IntoResponse {
 }
 
 pub fn api_router(state: ApiState) -> Router {
+    let req_id_header = HeaderName::from_static(REQUEST_ID_HEADER);
     let session_store = MemoryStore::default();
     let session_layer = SessionManagerLayer::new(session_store).with_secure(false);
     Router::new()
@@ -52,7 +60,25 @@ pub fn api_router(state: ApiState) -> Router {
         .with_state(state)
         .layer(
             ServiceBuilder::new()
-                .layer(TraceLayer::new_for_http())
+                .set_request_id(req_id_header.clone(), MakeRequestUuid)
+                .layer(
+                    TraceLayer::new_for_http().make_span_with(|req: &Request<_>| {
+                        let req_id = req
+                            .headers()
+                            .get(REQUEST_ID_HEADER)
+                            .expect("request id header should be set by the trace layer")
+                            .to_str()
+                            .unwrap();
+
+                        info_span!(
+                            "request",
+                            method = %req.method(),
+                            uri = %req.uri(),
+                            request_id = %req_id
+                        )
+                    }),
+                )
+                .propagate_request_id(req_id_header)
                 .layer(session_layer),
         )
 }

@@ -4,7 +4,7 @@ use axum::{
     routing::{get, Router},
     Form,
 };
-use secrecy::{ExposeSecret, SecretString};
+use secrecy::SecretString;
 use serde::Deserialize;
 use sqlx::PgPool;
 use tower_sessions::Session;
@@ -28,15 +28,13 @@ pub fn router() -> Router<ApiState> {
 
 #[instrument(skip_all)]
 async fn login_page(mut flash_msgs: FlashMessages) -> Result<Html<String>> {
-    let error_flash = flash_msgs
-        .get_msgs()
-        .await?
-        .into_iter()
-        .find_map(|fm| if fm.level == FlashMessageLevel::Error {
+    let error_flash = flash_msgs.get_msgs().await?.into_iter().find_map(|fm| {
+        if fm.level == FlashMessageLevel::Error {
             Some(fm.msg)
         } else {
             None
-        });
+        }
+    });
 
     debug!(flash_errors = ?error_flash);
 
@@ -89,8 +87,6 @@ async fn login_user(
     mut flash_msgs: FlashMessages,
     Form(credentials): Form<Credentials>,
 ) -> impl IntoResponse {
-    debug!(user_password = ?credentials.password.expose_secret());
-
     if let Some(user) = db::get_user_by_email(&pool, &credentials.email).await? {
         debug!("user in db");
         if verify_password(&credentials.password, &user.password_hash).await? {
@@ -109,6 +105,5 @@ async fn login_user(
 #[instrument(skip_all)]
 async fn logout_user(session: Session) -> Result<Redirect> {
     session.delete().await?;
-    session.cycle_id().await?;
     Ok(Redirect::to("/"))
 }
