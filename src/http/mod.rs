@@ -44,7 +44,7 @@ pub async fn serve_app(
 #[template(path = "home.html")]
 struct HomeTemplate;
 
-#[instrument(fields(action = "serving the home page"))]
+#[instrument(fields(action = "serving home page"))]
 async fn home_page() -> impl IntoResponse {
     render_template(HomeTemplate)
 }

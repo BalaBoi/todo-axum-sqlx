@@ -8,7 +8,7 @@ use secrecy::SecretString;
 use serde::Deserialize;
 use sqlx::PgPool;
 use tower_sessions::Session;
-use tracing::{debug, instrument};
+use tracing::{debug, info, instrument};
 
 use crate::http::users::verify_password;
 
@@ -26,7 +26,7 @@ pub fn router() -> Router<ApiState> {
         .route("/logout", get(logout_user))
 }
 
-#[instrument(skip_all)]
+#[instrument(skip_all, fields(%flash_msgs))]
 async fn login_page(mut flash_msgs: FlashMessages) -> Result<Html<String>> {
     let error_flash = flash_msgs.get_msgs().await?.into_iter().find_map(|fm| {
         if fm.level == FlashMessageLevel::Error {
@@ -70,7 +70,7 @@ async fn register_user(
         &password_hash,
     )
     .await?;
-
+    info!("finished registering a user");
     Ok(Redirect::to("/users/login"))
 }
 
@@ -80,7 +80,7 @@ struct Credentials {
     password: SecretString,
 }
 
-#[instrument(skip_all)]
+#[instrument(skip_all, fields(session_id = ?session.id(), %flash_msgs))]
 async fn login_user(
     State(pool): State<PgPool>,
     session: Session,

@@ -16,7 +16,7 @@ pub struct Task {
     pub user_id: Uuid,
 }
 
-#[instrument]
+#[instrument(skip_all, fields(%title, %description, %user_id))]
 pub async fn create_new_task(
     pool: &PgPool,
     title: &str,
@@ -38,14 +38,15 @@ pub async fn create_new_task(
     Ok(())
 }
 
-#[instrument]
-pub async fn delete_task(pool: &PgPool, task_id: Uuid) -> Result<()> {
+#[instrument(skip_all, fields(%task_id, %user_id))]
+pub async fn delete_task(pool: &PgPool, task_id: Uuid, user_id: Uuid) -> Result<()> {
     let query_result = sqlx::query!(
         r#"
         delete from task
-        where task_id = $1
+        where task_id = $1 and user_id = $2
         "#,
-        task_id
+        task_id,
+        user_id
     )
     .execute(pool)
     .await?;
@@ -56,7 +57,7 @@ pub async fn delete_task(pool: &PgPool, task_id: Uuid) -> Result<()> {
     Ok(())
 }
 
-#[instrument]
+#[instrument(skip_all, fields(%user_id))]
 pub async fn get_all_tasks(pool: &PgPool, user_id: Uuid) -> Result<Vec<Task>> {
     sqlx::query_as!(
         Task,

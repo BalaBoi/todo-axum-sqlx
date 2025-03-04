@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use axum::{extract::Request, middleware::Next, response::Response};
 use serde::{Deserialize, Serialize};
 use tower_sessions::Session;
@@ -23,6 +25,12 @@ impl UserSessionData {
 
     pub fn username(&self) -> &str {
         &self.username
+    }
+}
+
+impl Display for UserSessionData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "uuid: {}, username: {}", self.user_id, self.username)
     }
 }
 

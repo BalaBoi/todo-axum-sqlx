@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use anyhow::anyhow;
 use askama::Template;
 use axum::{
@@ -46,6 +48,15 @@ pub struct FlashMessage {
 pub enum FlashMessageLevel {
     Error,
     Success,
+}
+
+impl Display for FlashMessageLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Error => write!(f, "Error"),
+            Self::Success => write!(f, "Success"),
+        }
+    }
 }
 
 pub struct FlashMessages {
@@ -100,5 +111,15 @@ where
         flash_msgs.update_session().await?;
 
         Ok(flash_msgs)
+    }
+}
+
+impl Display for FlashMessages {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[")?;
+        for fm in self.msgs.iter() {
+            write!(f, "{}: {},", fm.level, fm.msg)?;
+        }
+        write!(f, "]")
     }
 }

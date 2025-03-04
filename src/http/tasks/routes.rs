@@ -52,7 +52,8 @@ pub struct UpdateTask {
     fields(
         action = "creating a task",
         %new_task.title,
-        ?new_task.description
+        ?new_task.description,
+        %user_session
     )
 )]
 pub async fn create_task(
@@ -71,12 +72,16 @@ pub async fn create_task(
     Ok(Redirect::to("/todo"))
 }
 
-#[instrument(skip_all, fields(action = "deleting a task", %task_id))]
-pub async fn delete_task(State(pool): State<PgPool>, Path(task_id): Path<Uuid>) -> Result<()> {
-    db::delete_task(&pool, task_id).await
+#[instrument(skip_all, fields(action = "deleting a task", %task_id, %user_session))]
+pub async fn delete_task(
+    State(pool): State<PgPool>,
+    Path(task_id): Path<Uuid>,
+    Extension(user_session): Extension<UserSessionData>,
+) -> Result<()> {
+    db::delete_task(&pool, task_id, user_session.user_id()).await
 }
 
-#[instrument(skip_all, fields(action = "displaying tasks page"))]
+#[instrument(skip_all, fields(action = "displaying tasks page", %user_session))]
 pub async fn tasks_page(
     State(pool): State<PgPool>,
     Extension(user_session): Extension<UserSessionData>,
@@ -89,7 +94,7 @@ pub async fn tasks_page(
     })
 }
 
-#[instrument(skip_all, fields(action = "displaying edit task page", %task_id))]
+#[instrument(skip_all, fields(action = "displaying edit task page", %task_id, %user_session))]
 pub async fn edit_task_page(
     State(pool): State<PgPool>,
     Path(task_id): Path<Uuid>,
@@ -114,6 +119,7 @@ pub async fn edit_task_page(
         %update_task.title,
         %update_task.description,
         %update_task.completed,
+        %user_session
 ))]
 pub async fn update_task(
     State(pool): State<PgPool>,
